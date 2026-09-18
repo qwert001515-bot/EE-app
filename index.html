@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>學習器 (Pro 極簡重構版)</title>
+    <title>學習器 (終極穩定版)</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
     <style>
@@ -47,7 +47,7 @@
 </head>
 <body>
 
-    <h2>⚡ 學習器 (Pro 重構版)</h2>
+    <h2>⚡ 學習器 (終極穩定版)</h2>
     
     <div class="pomodoro-bar">
         🍅 專注計時：<span id="timerDisplay">25:00</span>
@@ -79,18 +79,17 @@
         <button class="tab-btn" id="tabQA" onclick="switchTab('qa')">💬 圖文問答解題</button>
     </div>
 
-    <!-- 區域 1：聽課錄音 -->
     <div class="container" id="sectionBook">
         <button class="btn-blue" id="recordBtn">🔴 開始錄音聽課</button>
         <button class="btn-red" id="stopBtn">⏹️ 停止錄音並總結</button>
     </div>
 
-    <!-- 區域 2：圖文問答 (合併作業解題) -->
     <div class="container hidden" id="sectionQA">
         <div class="input-group">
             <label>⚙️ 選擇引擎：</label>
             <select id="engineSelect">
-                <option value="gemini">🧠 Gemini 1.5 Pro (全能解析、解題、讀圖)</option>
+                <!-- 將選項名稱更新，以防混淆，我們後台會統一呼叫最穩定的 gemini-1.5-flash -->
+                <option value="gemini">🧠 Gemini (全能解析、解題、讀圖)</option>
                 <option value="wolfram">🧮 WolframAlpha (純文字數學運算)</option>
             </select>
         </div>
@@ -123,7 +122,6 @@
     </div>
 
     <script>
-        // 初始化與設定
         mermaid.initialize({ startOnLoad: false, theme: 'default' });
 
         const apiKeyInput = document.getElementById('apiKey');
@@ -133,7 +131,6 @@
         apiKeyInput.addEventListener('input', e => localStorage.setItem('ee_gemini_key', e.target.value.trim()));
         wolframKeyInput.addEventListener('input', e => localStorage.setItem('ee_wolfram_key', e.target.value.trim()));
 
-        // 番茄鐘
         let pomoInterval, pomoTimeLeft = 25 * 60, isPomoRunning = false;
         function updTimer() { document.getElementById('timerDisplay').innerText = `${Math.floor(pomoTimeLeft/60).toString().padStart(2,'0')}:${(pomoTimeLeft%60).toString().padStart(2,'0')}`; }
         document.getElementById('pomoStartBtn').onclick = () => {
@@ -149,7 +146,6 @@
         };
         document.getElementById('pomoResetBtn').onclick = () => { clearInterval(pomoInterval); isPomoRunning = false; pomoTimeLeft = 25 * 60; updTimer(); document.getElementById('pomoStartBtn').innerText = '▶️ 開始'; };
 
-        // 頁籤切換 (合併簡化)
         function switchTab(mode) {
             document.getElementById('tabBook').classList.remove('active');
             document.getElementById('tabQA').classList.remove('active');
@@ -168,10 +164,7 @@
         const statusText = document.getElementById('status'), resultDiv = document.getElementById('result'), wolframResultImg = document.getElementById('wolframResult'), actionGroup = document.getElementById('actionGroup'), audioPlayback = document.getElementById('audioPlayback');
         let currentSummaryText = "";
 
-        // ==========================================
-        // 核心重構：最乾淨、最標準的檔案讀取器
-        // 不做任何 Canvas 壓縮，完全保留原貌，並且加入嚴格檢查
-        // ==========================================
+        // 最穩定、乾淨的 FileReader，專為截圖/標準相片設計
         function processFileClean(file) {
             return new Promise((resolve, reject) => {
                 if (!file) return reject("沒有接收到檔案。");
@@ -179,35 +172,28 @@
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     const dataUrl = e.target.result;
-                    
-                    // 1. 嚴格檢查瀏覽器是否成功產生 Base64 字串
                     if (typeof dataUrl !== 'string' || !dataUrl.includes('base64,')) {
-                        return reject("iPad 無法解析此檔案（可能是格式不支援或檔案損毀）。請嘗試截圖後上傳截圖檔！");
+                        return reject("iPad 無法解析此檔案。");
                     }
                     
-                    // 2. 切割標籤與數據
                     const parts = dataUrl.split('base64,');
                     let mimeMatch = parts[0].match(/data:(.*?);/);
                     let mimeType = mimeMatch ? mimeMatch[1] : '';
                     let base64Data = parts[1];
 
-                    // 3. 處理空標籤問題 (iOS HEIC 常見 Bug)
                     const validMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'audio/webm', 'audio/mp4'];
                     if (!mimeType || !validMimes.includes(mimeType)) {
-                        mimeType = 'image/jpeg'; // 強制保底格式
+                        mimeType = 'image/jpeg';
                     }
 
-                    // 4. 極致清理字串 (移除所有隱形換行與空白，符合 Google 嚴格正則規範)
                     base64Data = base64Data.replace(/[\r\n\s]+/g, "");
 
-                    // 5. 確保資料不是空的
                     if (!base64Data || base64Data.length < 50) {
-                        return reject("圖片轉碼為空。這通常代表 iPad 記憶體不足或檔案格式無法辨識。請改用「螢幕截圖」上傳！");
+                        return reject("圖片轉碼為空。");
                     }
 
                     resolve({ mimeType: mimeType, data: base64Data });
                 };
-                
                 reader.onerror = () => reject("檔案讀取發生錯誤，請重新選取。");
                 reader.readAsDataURL(file);
             });
@@ -222,16 +208,15 @@
             setTimeout(() => mermaid.init(undefined, document.querySelectorAll('.mermaid')), 100);
         }
 
-        // ==========================================
-        // Gemini 呼叫核心
-        // ==========================================
+        // 呼叫最穩定無 bug 的 gemini-1.5-flash
         async function callGemini(partsArray) {
             resultDiv.style.display = 'block';
             wolframResultImg.style.display = 'none';
             statusText.innerText = '🚀 正在傳送至 Gemini API...';
 
             try {
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKeyInput.value.trim()}`, {
+                // 模型改回確定有效的 gemini-1.5-flash
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKeyInput.value.trim()}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ contents: [{ parts: partsArray }] })
@@ -253,17 +238,10 @@
                 resultDiv.innerHTML = `
                     <div style="color:red; font-weight:bold;">🚨 發生錯誤：</div>
                     <div class="error-code">${err.message}</div>
-                    <div style="margin-top:10px; font-size:14px; color:#555;">
-                        💡 <b>如果是 The string did not match... 錯誤：</b><br>
-                        這代表您的 iPad 瀏覽器無法正確讀取這張相片。<b>請將該照片在相簿中打開，用平板「截圖」後，上傳那張新的截圖檔案</b>，100% 可以解決此問題！
-                    </div>
                 `;
             }
         }
 
-        // ==========================================
-        // 錄音功能
-        // ==========================================
         let mediaRecorder, audioChunks = [];
         const recordBtn = document.getElementById('recordBtn'), stopBtn = document.getElementById('stopBtn');
         recordBtn.onclick = async () => {
@@ -291,9 +269,6 @@
         };
         stopBtn.onclick = () => { mediaRecorder.stop(); mediaRecorder.stream.getTracks().forEach(t => t.stop()); };
 
-        // ==========================================
-        // 圖文問答與解題
-        // ==========================================
         const qaPhotoFile = document.getElementById('qaPhotoFile'), qaImgPrev = document.getElementById('qaImagePreview');
         qaPhotoFile.onchange = e => { 
             if (e.target.files.length) { 
@@ -335,7 +310,7 @@
             } 
             else if (engine === "wolfram") {
                 if (file) {
-                    alert("目前極簡重構版，Wolfram 模式僅支援純文字數學式計算。圖片解題請使用 Gemini Pro 引擎！");
+                    alert("目前極簡重構版，Wolfram 模式僅支援純文字數學式計算。圖片解題請使用 Gemini 引擎！");
                     return;
                 }
                 statusText.innerText = '🧮 Wolfram 計算中...';
@@ -346,7 +321,6 @@
             }
         };
 
-        // 匯出功能
         document.getElementById('cloudBtn').onclick = () => {
             if (!currentSummaryText) return;
             const blob = new Blob([currentSummaryText], { type: 'text/plain' });
