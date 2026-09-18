@@ -40,12 +40,15 @@
         #audioPlayback { width: 100%; display: none; margin-top: 10px; border-radius: 8px; }
         .img-preview { max-width: 100%; border-radius: 8px; display: none; margin-top: 10px; border: 1px solid #dee2e6; }
         
-        .result-box { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .result-box { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
         h3 { color: #2c3e50; margin-top: 0; border-bottom: 2px solid #e9ecef; padding-bottom: 5px; }
         #result { background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #e9ecef; min-height: 150px; font-size: 16px; overflow-x: auto; }
         
         #wolframResult { max-width: 100%; border-radius: 8px; display: none; margin-top: 10px; }
         .hidden { display: none !important; }
+        
+        /* 頁尾計數器樣式 */
+        .footer-counter { text-align: center; margin-top: 30px; margin-bottom: 30px; font-size: 14px; color: #888; }
     </style>
 </head>
 <body>
@@ -103,7 +106,7 @@
         <button class="btn-red" id="stopBtn">⏹️ 停止錄音並總結</button>
     </div>
 
-    <!-- 區域 2：拍照解題區 -->
+    <!-- 區域 2：拍照解題區 (已修復檔案選取功能) -->
     <div class="container hidden" id="sectionHomework">
         <div class="input-group">
             <label>⚙️ 選擇看圖引擎：</label>
@@ -113,8 +116,9 @@
             </select>
         </div>
         <div class="input-group" style="margin-top: 10px;">
-            <label>📸 拍攝作業紙本：</label>
-            <input type="file" id="photoFile" accept="image/*" capture="environment" />
+            <label>📸 拍攝或上傳作業相片：</label>
+            <!-- 移除 capture="environment"，讓 iPad 彈出「相機 / 圖庫 / 檔案」選單 -->
+            <input type="file" id="photoFile" accept="image/*" />
             <img id="imagePreview" class="img-preview" alt="預覽圖片" />
         </div>
         <button class="btn-purple" id="analyzePhotoBtn">🚀 讓 AI 幫我解題</button>
@@ -154,31 +158,25 @@
         <img id="wolframResult" alt="Wolfram 運算結果" />
     </div>
 
+    <!-- 📊 專屬訪客計數器 -->
+    <div class="footer-counter">
+        <p>⚡ 專屬學習神器運作中</p>
+        <img src="https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https://qwert001515-bot.github.io/EE-app/&count_bg=%23007bff&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=網站瀏覽人次&edge_flat=false" alt="訪客計數器">
+    </div>
+
     <script>
         // --- 🔑 自動記憶金鑰系統 (LocalStorage) ---
         const apiKeyInput = document.getElementById('apiKey');
         const wolframKeyInput = document.getElementById('wolframKey');
 
-        // 1. 網頁一載入，就去檢查保險箱有沒有存過金鑰
-        if (localStorage.getItem('ee_gemini_key')) {
-            apiKeyInput.value = localStorage.getItem('ee_gemini_key');
-        }
-        if (localStorage.getItem('ee_wolfram_key')) {
-            wolframKeyInput.value = localStorage.getItem('ee_wolfram_key');
-        }
+        if (localStorage.getItem('ee_gemini_key')) apiKeyInput.value = localStorage.getItem('ee_gemini_key');
+        if (localStorage.getItem('ee_wolfram_key')) wolframKeyInput.value = localStorage.getItem('ee_wolfram_key');
 
-        // 2. 只要你貼上新的金鑰，立刻自動存進保險箱
-        apiKeyInput.addEventListener('input', (e) => {
-            localStorage.setItem('ee_gemini_key', e.target.value.trim());
-        });
-        wolframKeyInput.addEventListener('input', (e) => {
-            localStorage.setItem('ee_wolfram_key', e.target.value.trim());
-        });
+        apiKeyInput.addEventListener('input', (e) => localStorage.setItem('ee_gemini_key', e.target.value.trim()));
+        wolframKeyInput.addEventListener('input', (e) => localStorage.setItem('ee_wolfram_key', e.target.value.trim()));
 
         // --- 🍅 番茄鐘邏輯 ---
-        let pomoInterval;
-        let pomoTimeLeft = 25 * 60;
-        let isPomoRunning = false;
+        let pomoInterval; let pomoTimeLeft = 25 * 60; let isPomoRunning = false;
         const timerDisplay = document.getElementById('timerDisplay');
         const pomoStartBtn = document.getElementById('pomoStartBtn');
         const pomoResetBtn = document.getElementById('pomoResetBtn');
@@ -227,7 +225,7 @@
             } else if (mode === 'homework') {
                 document.getElementById('tabHomework').classList.add('active');
                 document.getElementById('sectionHomework').classList.remove('hidden');
-                document.getElementById('status').innerText = '請點擊上方按鈕開啟相機。';
+                document.getElementById('status').innerText = '請點擊上方按鈕選擇圖片或拍照。';
             } else if (mode === 'qa') {
                 document.getElementById('tabQA').classList.add('active');
                 document.getElementById('sectionQA').classList.remove('hidden');
@@ -304,7 +302,7 @@
             const hwEngine = hwEngineSelect.value;
             if (hwEngine === 'gemini' && !apiKeyInput.value) return alert("請輸入 Gemini 金鑰！");
             if (hwEngine === 'wolfram' && (!apiKeyInput.value || !wolframKeyInput.value)) return alert("Wolfram 看圖模式需要同時輸入 Gemini 與 Wolfram 金鑰！");
-            if (photoFile.files.length === 0) return alert("請先拍照！");
+            if (photoFile.files.length === 0) return alert("請先拍照或上傳圖片！");
 
             currentMode = "拍照解題"; currentAudioBlob = null; audioPlayback.style.display = 'none';
             actionGroup.classList.add('hidden');
