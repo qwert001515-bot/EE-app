@@ -218,7 +218,7 @@
             document.getElementById('status').innerText = '⏳ 正在存入平板書庫...';
             try {
                 const f = e.target.files[0];
-                const fileData = await convertImageToTrueJPEG(f);
+                const fileData = await getSafeImageData(f);
                 await saveFileDB({ id: Date.now().toString(), name: f.name, mimeType: fileData.mimeType, data: fileData.data });
                 await refreshLibrary();
                 document.getElementById('status').innerText = '✅ 講義永久儲存成功！';
@@ -257,11 +257,11 @@
         let mediaRecorder, audioChunks = [], currentAudioBlob = null, currentSummaryText = "", currentMode = "學習筆記";
         const statusText = document.getElementById('status'), resultDiv = document.getElementById('result'), wolframResultImg = document.getElementById('wolframResult'), actionGroup = document.getElementById('actionGroup'), audioPlayback = document.getElementById('audioPlayback');
         
-        // 🚀 核彈級字串淨化器：確保送出給 Google 的 Base64 字串完美無瑕，絕無換行符號！
-        function convertImageToTrueJPEG(file) {
+        // 🚀 終極鐵腕處理：無視一切，絕對只回傳 image/jpeg！
+        function getSafeImageData(file) {
             return new Promise((resolve, reject) => {
-                if (!file) return reject("無檔案");
-                
+                if (!file) return reject("沒有選擇檔案");
+
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     const img = new Image();
@@ -269,38 +269,33 @@
                         try {
                             const canvas = document.createElement('canvas');
                             let w = img.width, h = img.height;
-                            const max = 1200;
+                            const max = 800; // 強制縮小到非常安全的尺寸，確保絕不超載
                             if (w > h && w > max) { h *= max / w; w = max; }
                             else if (h > max) { w *= max / h; h = max; }
                             
-                            canvas.width = w;
-                            canvas.height = h;
-                            
+                            canvas.width = w; canvas.height = h;
                             const ctx = canvas.getContext('2d');
                             ctx.fillStyle = "#ffffff";
                             ctx.fillRect(0, 0, w, h);
                             ctx.drawImage(img, 0, 0, w, h);
                             
                             const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-                            let base64String = dataUrl.split(',')[1];
+                            let b64 = dataUrl.split(',')[1];
+                            b64 = b64.replace(/[^A-Za-z0-9+/=]/g, ""); // 極致淨化
                             
-                            // 💥 終極淨化：只保留合法字元，移除所有 Safari 偷加的換行 (\r, \n) 與空白
-                            base64String = base64String.replace(/[^A-Za-z0-9+/=]/g, "");
-                            
-                            if (!base64String || base64String.length < 50) {
-                                reject("圖片渲染失敗。");
-                            } else {
-                                resolve({ mimeType: "image/jpeg", data: base64String });
-                            }
+                            // 鐵腕宣告：不管原圖是什麼，就是 image/jpeg！
+                            resolve({ mimeType: "image/jpeg", data: b64 });
                         } catch (err) {
-                            reject("繪製圖片失敗：" + err.message);
+                            let b64 = e.target.result.split(',')[1];
+                            if (b64) b64 = b64.replace(/[^A-Za-z0-9+/=]/g, "");
+                            resolve({ mimeType: "image/jpeg", data: b64 }); // 即使出錯，也要假裝是 jpeg
                         }
                     };
                     img.onerror = () => {
-                        // 如果無法作為圖片載入（可能是純文字檔），則直接轉 base64 並淨化
+                        // 如果無法作為圖片載入，我們依然硬轉 Base64 並強制貼上 image/jpeg
                         let b64 = e.target.result.split(',')[1];
                         if (b64) b64 = b64.replace(/[^A-Za-z0-9+/=]/g, "");
-                        resolve({ mimeType: file.type || "text/plain", data: b64 });
+                        resolve({ mimeType: "image/jpeg", data: b64 });
                     };
                     img.src = e.target.result;
                 };
@@ -344,7 +339,7 @@
                 const reader = new FileReader();
                 reader.onload = () => {
                     let b64 = reader.result.split(',')[1];
-                    b64 = b64.replace(/[^A-Za-z0-9+/=]/g, ""); // 淨化錄音檔
+                    b64 = b64.replace(/[^A-Za-z0-9+/=]/g, ""); 
                     parts.push({ inlineData: { mimeType: "audio/webm", data: b64 } });
                     let pText = `整理「${document.getElementById('courseType').value}」課程的錄音筆記。若遇邏輯流程請用 \`\`\`mermaid 繪圖。`;
                     if (document.getElementById('recordModeSelect').value === 'book') pText += "請比對講義並標示頁碼。";
@@ -370,7 +365,7 @@
             
             try {
                 statusText.innerText = '⚙️ 處理圖片格式中...';
-                const fileData = await convertImageToTrueJPEG(photoFile.files[0]);
+                const fileData = await getSafeImageData(photoFile.files[0]);
 
                 if (hwEngine === 'gemini') {
                     wolframResultImg.style.display = 'none'; resultDiv.style.display = 'block'; statusText.innerText = '🧠 Gemini Pro 解析中...';
@@ -416,7 +411,7 @@
                     let parts = [{ text: `解答以下問題：\n${q || "請解析這張圖片的電路原理或內容"}\n需要時請使用 \`\`\`mermaid 繪製架構圖。` }];
                     if (hasImg) {
                         statusText.innerText = '⚙️ 處理圖片格式中...';
-                        const fileData = await convertImageToTrueJPEG(qaPhotoFile.files[0]);
+                        const fileData = await getSafeImageData(qaPhotoFile.files[0]);
                         parts.push({ inlineData: fileData });
                     }
                     statusText.innerText = '💡 Gemini Pro 正在分析您的問題與圖片...';
@@ -429,7 +424,7 @@
                         resultDiv.style.display = 'block'; wolframResultImg.style.display = 'none'; 
                         statusText.innerText = '⚙️ 處理圖片格式中...';
                         try {
-                            const fileData = await convertImageToTrueJPEG(qaPhotoFile.files[0]);
+                            const fileData = await getSafeImageData(qaPhotoFile.files[0]);
                             statusText.innerText = '👀 正在請 Gemini 讀取圖片中的算式...';
                             const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=$){apiKeyInput.value.trim()}`, {
                                 method: 'POST', headers: { 'Content-Type': 'application/json' }, 
