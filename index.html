@@ -217,7 +217,7 @@
             if(!e.target.files.length) return;
             document.getElementById('status').innerText = '⏳ 正在存入平板書庫...';
             const f = e.target.files[0];
-            const fileData = await processFileSimple(f);
+            const fileData = await processFileBinary(f);
             await saveFileDB({ id: Date.now().toString(), name: f.name, mimeType: fileData.mimeType, data: fileData.data });
             await refreshLibrary();
             document.getElementById('status').innerText = '✅ 講義永久儲存成功！';
@@ -253,28 +253,40 @@
         let mediaRecorder, audioChunks = [], currentAudioBlob = null, currentSummaryText = "", currentMode = "學習筆記";
         const statusText = document.getElementById('status'), resultDiv = document.getElementById('result'), wolframResultImg = document.getElementById('wolframResult'), actionGroup = document.getElementById('actionGroup'), audioPlayback = document.getElementById('audioPlayback');
         
-        // 🚀 強制校正檔案格式：不管 iPad 怎麼說，只要是圖片我們通通強制宣告為 image/jpeg 給 Google 審查！
-        function processFileSimple(file) {
+        // 🚀 終極二進位讀取與強制填充器
+        function encodeBase64WithPadding(buffer) {
+            let binary = '';
+            const bytes = new Uint8Array(buffer);
+            // 為了避免 iPad 記憶體崩潰，我們採用分塊轉換字串
+            const chunkSize = 8192;
+            for (let i = 0; i < bytes.length; i += chunkSize) {
+                binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+            }
+            let base64 = window.btoa(binary);
+            
+            // 強制檢查並補齊 Base64 結尾的 '=' (Google API 嚴格要求)
+            while (base64.length % 4 !== 0) {
+                base64 += '=';
+            }
+            return base64;
+        }
+
+        function processFileBinary(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.onload = (e) => {
-                    const result = e.target.result;
-                    let base64String = "";
-                    
-                    if (result.includes(',')) {
-                        base64String = result.split(',')[1];
-                    } else {
-                        base64String = result;
+                    try {
+                        const base64String = encodeBase64WithPadding(e.target.result);
+                        // 強制宣告為 image/jpeg 以通過 Gemini 審查
+                        const safeMime = file.type.startsWith('image/') ? 'image/jpeg' : (file.type || 'text/plain');
+                        resolve({ mimeType: safeMime, data: base64String });
+                    } catch (err) {
+                        reject(err);
                     }
-                    
-                    // 為了確保字串絕對乾淨，手動去除可能夾帶的換行符號
-                    base64String = base64String.replace(/[\r\n\s]+/g, "");
-
-                    // 強制安全 MIME Type：不管 file.type 回傳什麼怪東西 (如空字串、image/heic)，一律當作 jpeg 給 Gemini 處理
-                    resolve({ mimeType: "image/jpeg", data: base64String });
                 };
                 reader.onerror = () => reject(new Error("無法讀取檔案"));
-                reader.readAsDataURL(file);
+                // 放棄 DataURL，直接讀取底層二進位陣列
+                reader.readAsArrayBuffer(file);
             });
         }
         
@@ -309,7 +321,7 @@
                 const fData = await getFileByIdDB(activeFileSelect.value);
                 if(fData) parts.push({ inlineData: { mimeType: fData.mimeType, data: fData.data } });
             }
-            const audioData = await processFileSimple(currentAudioBlob);
+            const audioData = await processFileBinary(currentAudioBlob);
             parts.push({ inlineData: { mimeType: "audio/webm", data: audioData.data } });
             let pText = `整理「${document.getElementById('courseType').value}」課程的錄音筆記。若遇邏輯流程請用 \`\`\`mermaid 繪圖。`;
             if (document.getElementById('recordModeSelect').value === 'book') pText += "請比對講義並標示頁碼。";
@@ -328,7 +340,7 @@
             currentMode = "拍照解題"; currentAudioBlob = null; audioPlayback.style.display = 'none'; actionGroup.classList.add('hidden');
             
             try {
-                const fileData = await processFileSimple(photoFile.files[0]);
+                const fileData = await processFileBinary(photoFile.files[0]);
 
                 if (hwEngine === 'gemini') {
                     wolframResultImg.style.display = 'none'; resultDiv.style.display = 'block'; statusText.innerText = '🧠 Gemini Pro 解析中...';
@@ -373,7 +385,7 @@
                     
                     let parts = [{ text: `解答以下問題：\n${q || "請解析這張圖片的電路原理或內容"}\n需要時請使用 \`\`\`mermaid 繪製架構圖。` }];
                     if (hasImg) {
-                        const fileData = await processFileSimple(qaPhotoFile.files[0]);
+                        const fileData = await processFileBinary(qaPhotoFile.files[0]);
                         parts.push({ inlineData: fileData });
                     }
                     callGeminiAPI(parts);
@@ -384,7 +396,7 @@
                     if (hasImg) {
                         resultDiv.style.display = 'block'; wolframResultImg.style.display = 'none'; statusText.innerText = '👀 正在請 Gemini 讀取圖片中的算式...';
                         try {
-                            const fileData = await processFileSimple(qaPhotoFile.files[0]);
+                            const fileData = await processFileBinary(qaPhotoFile.files[0]);
                             const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=$){apiKeyInput.value.trim()}`, {
                                 method: 'POST', headers: { 'Content-Type': 'application/json' }, 
                                 body: JSON.stringify({ contents: [{ parts: [{text: "Extract ONLY the math expression in plain text (e.g. x^2+5x=0). NO markdown."}, { inlineData: fileData }] }] })
