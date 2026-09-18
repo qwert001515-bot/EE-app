@@ -345,7 +345,7 @@
             } else {
                 wolframResultImg.style.display = 'none'; resultDiv.style.display = 'block'; statusText.innerText = '👀 辨識數學式...'; resultDiv.innerHTML = '影像處理中...';
                 try {
-                    const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$){apiKeyInput.value.trim()}`, {
+                    const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$){apiKeyInput.value.trim()}`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' }, 
                         body: JSON.stringify({ contents: [{ parts: [{text: "Extract ONLY the math expression in plain text (e.g. x^2+5x=0). NO markdown."}, { inlineData: { mimeType: "image/jpeg", data: b64 } }] }] })
                     });
@@ -367,7 +367,7 @@
         qaPhotoFile.onchange = e => { if (e.target.files.length) { qaImgPrev.src = URL.createObjectURL(e.target.files[0]); qaImgPrev.style.display = 'block'; } };
         
         // ==========================================
-        // 🛠️ 徹底修復：圖文問答送出邏輯 (完全獨立的分支)
+        // 🛡️ 升級版：支援最新 gemini-2.5-flash 模型
         // ==========================================
         document.getElementById('askBtn').onclick = async () => {
             const q = document.getElementById('questionText').value.trim();
@@ -378,7 +378,6 @@
             currentMode = engine === "gemini" ? "Gemini問答" : "Wolfram計算";
             currentAudioBlob = null; audioPlayback.style.display = 'none'; actionGroup.classList.add('hidden');
 
-            // 1. 如果選擇 Gemini 引擎：直接走純 Gemini 圖文問答，絕不碰 Wolfram
             if (engine === "gemini") {
                 if (!apiKeyInput.value) return alert("請輸入 Google Gemini 金鑰！");
                 wolframResultImg.style.display = 'none'; 
@@ -392,7 +391,6 @@
                 }
                 callGeminiAPI(parts);
             } 
-            // 2. 如果選擇 Wolfram 引擎：才走數學計算
             else if (engine === "wolfram") {
                 if (!wolframKeyInput.value) return alert("請輸入 WolframAlpha AppID！");
                 
@@ -403,7 +401,7 @@
                     
                     try {
                         const b64 = await fileToBase64(qaPhotoFile.files[0]);
-                        const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$){apiKeyInput.value.trim()}`, {
+                        const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$){apiKeyInput.value.trim()}`, {
                             method: 'POST', headers: { 'Content-Type': 'application/json' }, 
                             body: JSON.stringify({ contents: [{ parts: [{text: "Extract ONLY the math expression in plain text (e.g. x^2+5x=0). NO markdown."}, { inlineData: { mimeType: "image/jpeg", data: b64 } }] }] })
                         });
@@ -448,7 +446,7 @@
         async function callGeminiAPI(parts) {
             resultDiv.style.display = 'block';
             try {
-                const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$){apiKeyInput.value.trim()}`, {
+                const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$){apiKeyInput.value.trim()}`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: parts }] })
                 });
                 const data = await res.json();
@@ -485,7 +483,7 @@
             if (!currentSummaryText || !apiKeyInput.value) return;
             statusText.innerText = '⏳ 製作閃卡中...';
             try {
-                const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$){apiKeyInput.value.trim()}`, {
+                const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$){apiKeyInput.value.trim()}`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: `嚴格以 CSV 格式輸出5題問答 (問題,答案)。內容：\n${currentSummaryText}` }] }] })
                 });
                 const data = await res.json();
