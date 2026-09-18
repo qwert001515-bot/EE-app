@@ -217,8 +217,8 @@
             if(!e.target.files.length) return;
             document.getElementById('status').innerText = '⏳ 正在存入平板書庫...';
             const f = e.target.files[0];
-            const b64 = await processFileSafe(f);
-            await saveFileDB({ id: Date.now().toString(), name: f.name, mimeType: f.type || "text/plain", data: b64 });
+            const fileData = await processFileSafe(f);
+            await saveFileDB({ id: Date.now().toString(), name: f.name, mimeType: fileData.mimeType, data: fileData.data });
             await refreshLibrary();
             document.getElementById('status').innerText = '✅ 講義永久儲存成功！';
             libraryUpload.value = '';
@@ -253,35 +253,45 @@
         let mediaRecorder, audioChunks = [], currentAudioBlob = null, currentSummaryText = "", currentMode = "學習筆記";
         const statusText = document.getElementById('status'), resultDiv = document.getElementById('result'), wolframResultImg = document.getElementById('wolframResult'), actionGroup = document.getElementById('actionGroup'), audioPlayback = document.getElementById('audioPlayback');
         
-        // 🛡️ 雙重保險防爆讀取器：如果壓縮失敗，自動改傳原圖，絕不產生空字串！
+        // 🛡️ 終極防爆器：攔截並清除 iPad Safari 暗中加入的換行符號與空白，並返回安全的格式物件
         function processFileSafe(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.onload = (e) => {
-                    const rawB64 = e.target.result.split(',')[1];
-                    if (!file.type.startsWith('image/')) { resolve(rawB64); return; }
+                    let rawB64 = e.target.result.split(',')[1];
+                    // 淨化字串：移除所有非 Base64 的合法字元 (\r, \n, 空格等)
+                    if (rawB64) rawB64 = rawB64.replace(/[^a-zA-Z0-9+/=]/g, '');
+                    
+                    let originalMime = file.type || "image/jpeg";
+
+                    if (!originalMime.startsWith('image/')) { 
+                        resolve({ mimeType: originalMime, data: rawB64 }); 
+                        return; 
+                    }
                     
                     const img = new Image();
                     img.onload = () => {
                         try {
                             const canvas = document.createElement('canvas');
                             let w = img.width, h = img.height;
-                            const max = 1500; // Pro 模型讀取極限較高，保留更多清晰度
+                            const max = 1500; 
                             if (w > h && w > max) { h *= max / w; w = max; }
                             else if (h > max) { w *= max / h; h = max; }
                             canvas.width = w; canvas.height = h;
                             const ctx = canvas.getContext('2d');
                             ctx.drawImage(img, 0, 0, w, h);
-                            const b64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+                            let b64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
                             
-                            // 如果 iPad 壓縮失敗導致字串過短，啟動防爆機制回傳原圖
-                            if (b64 && b64.length > 100) resolve(b64);
-                            else resolve(rawB64);
+                            // 再次淨化壓縮後的字串
+                            if (b64) b64 = b64.replace(/[^a-zA-Z0-9+/=]/g, '');
+                            
+                            if (b64 && b64.length > 100) resolve({ mimeType: "image/jpeg", data: b64 });
+                            else resolve({ mimeType: originalMime, data: rawB64 });
                         } catch (err) {
-                            resolve(rawB64);
+                            resolve({ mimeType: originalMime, data: rawB64 });
                         }
                     };
-                    img.onerror = () => resolve(rawB64);
+                    img.onerror = () => resolve({ mimeType: originalMime, data: rawB64 });
                     img.src = e.target.result;
                 };
                 reader.onerror = reject;
@@ -311,6 +321,7 @@
             } catch (err) { alert('無法啟用麥克風！'); }
         };
         stopBtn.onclick = () => { mediaRecorder.stop(); mediaRecorder.stream.getTracks().forEach(t => t.stop()); stopBtn.style.display = 'none'; statusText.innerText = '⏳ 處理中...'; };
+        
         async function processBookMode() {
             currentMode = "錄音筆記"; currentAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
             audioPlayback.src = URL.createObjectURL(currentAudioBlob); audioPlayback.style.display = 'block';
@@ -319,7 +330,8 @@
                 const fData = await getFileByIdDB(activeFileSelect.value);
                 if(fData) parts.push({ inlineData: { mimeType: fData.mimeType, data: fData.data } });
             }
-            parts.push({ inlineData: { mimeType: "audio/webm", data: await processFileSafe(currentAudioBlob) } });
+            const audioData = await processFileSafe(currentAudioBlob);
+            parts.push({ inlineData: audioData });
             let pText = `整理「${document.getElementById('courseType').value}」課程的錄音筆記。若遇邏輯流程請用 \`\`\`mermaid 繪圖。`;
             if (document.getElementById('recordModeSelect').value === 'book') pText += "請比對講義並標示頁碼。";
             parts.unshift({ text: pText });
@@ -335,20 +347,17 @@
             if (!photoFile.files.length) return alert("請先選擇圖片！");
             
             currentMode = "拍照解題"; currentAudioBlob = null; audioPlayback.style.display = 'none'; actionGroup.classList.add('hidden');
-            const f = photoFile.files[0];
-            const mimeType = f.type || "image/jpeg";
-            const b64 = await processFileSafe(f);
+            const fileData = await processFileSafe(photoFile.files[0]);
 
             if (hwEngine === 'gemini') {
                 wolframResultImg.style.display = 'none'; resultDiv.style.display = 'block'; statusText.innerText = '🧠 Gemini Pro 解析中...';
-                callGeminiAPI([{ text: "給出詳細解題步驟，需要時用 ```mermaid 畫圖表。" }, { inlineData: { mimeType: mimeType, data: b64 } }]);
+                callGeminiAPI([{ text: "給出詳細解題步驟，需要時用 ```mermaid 畫圖表。" }, { inlineData: fileData }]);
             } else {
                 wolframResultImg.style.display = 'none'; resultDiv.style.display = 'block'; statusText.innerText = '👀 辨識數學式...'; resultDiv.innerHTML = '影像處理中...';
                 try {
-                    // 全面升級：gemini-1.5-pro
                     const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=$){apiKeyInput.value.trim()}`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' }, 
-                        body: JSON.stringify({ contents: [{ parts: [{text: "Extract ONLY the math expression in plain text (e.g. x^2+5x=0). NO markdown."}, { inlineData: { mimeType: mimeType, data: b64 } }] }] })
+                        body: JSON.stringify({ contents: [{ parts: [{text: "Extract ONLY the math expression in plain text (e.g. x^2+5x=0). NO markdown."}, { inlineData: fileData }] }] })
                     });
                     const data = await res.json();
                     if(data.error) throw new Error(data.error.message);
@@ -379,10 +388,8 @@
                 
                 let parts = [{ text: `解答以下問題：\n${q || "請解析這張圖片的電路原理或內容"}\n需要時請使用 \`\`\`mermaid 繪製架構圖。` }];
                 if (hasImg) {
-                    const f = qaPhotoFile.files[0];
-                    const mimeType = f.type || "image/jpeg";
-                    const b64 = await processFileSafe(f);
-                    parts.push({ inlineData: { mimeType: mimeType, data: b64 } });
+                    const fileData = await processFileSafe(qaPhotoFile.files[0]);
+                    parts.push({ inlineData: fileData });
                 }
                 callGeminiAPI(parts);
             } 
@@ -392,13 +399,10 @@
                 if (hasImg) {
                     resultDiv.style.display = 'block'; wolframResultImg.style.display = 'none'; statusText.innerText = '👀 正在請 Gemini 讀取圖片中的算式...';
                     try {
-                        const f = qaPhotoFile.files[0];
-                        const mimeType = f.type || "image/jpeg";
-                        const b64 = await processFileSafe(f);
-                        // 全面升級：gemini-1.5-pro
+                        const fileData = await processFileSafe(qaPhotoFile.files[0]);
                         const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=$){apiKeyInput.value.trim()}`, {
                             method: 'POST', headers: { 'Content-Type': 'application/json' }, 
-                            body: JSON.stringify({ contents: [{ parts: [{text: "Extract ONLY the math expression in plain text (e.g. x^2+5x=0). NO markdown."}, { inlineData: { mimeType: mimeType, data: b64 } }] }] })
+                            body: JSON.stringify({ contents: [{ parts: [{text: "Extract ONLY the math expression in plain text (e.g. x^2+5x=0). NO markdown."}, { inlineData: fileData }] }] })
                         });
                         const data = await res.json();
                         if(data.error) throw new Error(data.error.message);
@@ -419,7 +423,6 @@
             }
         };
 
-        // 全面升級主 API 呼叫函數為 gemini-1.5-pro
         async function callGeminiAPI(parts) {
             resultDiv.style.display = 'block';
             try {
@@ -431,11 +434,7 @@
                 currentSummaryText = data.candidates[0].content.parts[0].text;
                 renderResult(currentSummaryText);
                 statusText.innerText = '✅ 處理完成！'; actionGroup.classList.remove('hidden'); recordBtn.style.display = 'block';
-            } catch (e) { 
-                statusText.innerText = '❌ 處理失敗'; 
-                resultDiv.innerHTML = `<span style="color:red;">API 錯誤原因：${e.message || '網路異常或金鑰錯誤'}</span>`;
-                recordBtn.style.display = 'block'; 
-            }
+            } catch (e) { statusText.innerText = '❌ 處理失敗'; resultDiv.innerHTML = `<span style="color:red;">API 錯誤原因：${e.message || '網路異常或金鑰錯誤'}</span>`; recordBtn.style.display = 'block'; }
         }
 
         document.getElementById('cloudBtn').onclick = async () => {
@@ -460,7 +459,6 @@
             if (!currentSummaryText || !apiKeyInput.value) return;
             statusText.innerText = '⏳ 製作閃卡中...';
             try {
-                // 閃卡製作同樣升級為 pro
                 const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=$){apiKeyInput.value.trim()}`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: `嚴格以 CSV 格式輸出5題問答 (問題,答案)。內容：\n${currentSummaryText}` }] }] })
                 });
