@@ -267,7 +267,6 @@
         let mediaRecorder, audioChunks = [], currentAudioBlob = null, currentSummaryText = "", currentMode = "學習筆記";
         const statusText = document.getElementById('status'), resultDiv = document.getElementById('result'), wolframResultImg = document.getElementById('wolframResult'), actionGroup = document.getElementById('actionGroup'), audioPlayback = document.getElementById('audioPlayback');
         
-        // 🛡️ 圖片自動壓縮處理，防止檔案太大導致上傳失敗
         function fileToBase64(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -275,22 +274,16 @@
                     const img = new Image();
                     img.onload = () => {
                         const canvas = document.createElement('canvas');
-                        let width = img.width;
-                        let height = img.height;
-                        const maxDim = 1200; // 限制最大邊長以防過大
-                        if (width > height && width > maxDim) {
-                            height *= maxDim / width; width = maxDim;
-                        } else if (height > maxDim) {
-                            width *= maxDim / height; height = maxDim;
-                        }
+                        let width = img.width, height = img.height;
+                        const maxDim = 1200;
+                        if (width > height && width > maxDim) { height *= maxDim / width; width = maxDim; }
+                        else if (height > maxDim) { width *= maxDim / height; height = maxDim; }
                         canvas.width = width; canvas.height = height;
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, width, height);
-                        // 壓縮成 JPEG 80% 品質
-                        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-                        resolve(dataUrl.split(',')[1]);
+                        resolve(canvas.toDataURL('image/jpeg', 0.8).split(',')[1]);
                     };
-                    img.onerror = () => resolve(e.target.result.split(',')[1]); // 若非圖片直接回傳
+                    img.onerror = () => resolve(e.target.result.split(',')[1]);
                     img.src = e.target.result;
                 };
                 reader.onerror = reject;
@@ -373,6 +366,9 @@
         const qaPhotoFile = document.getElementById('qaPhotoFile'), qaImgPrev = document.getElementById('qaImagePreview');
         qaPhotoFile.onchange = e => { if (e.target.files.length) { qaImgPrev.src = URL.createObjectURL(e.target.files[0]); qaImgPrev.style.display = 'block'; } };
         
+        // ==========================================
+        // 修正後的圖文問答送出邏輯 (分開 Gemini 與 Wolfram)
+        // ==========================================
         document.getElementById('askBtn').onclick = async () => {
             const q = document.getElementById('questionText').value.trim();
             const hasImg = qaPhotoFile.files.length > 0;
@@ -384,8 +380,11 @@
 
             if (engine === "gemini") {
                 if (!apiKeyInput.value) return alert("請輸入 Gemini 金鑰！");
-                wolframResultImg.style.display = 'none'; resultDiv.style.display = 'block'; statusText.innerText = '💡 思考中...';
-                let parts = [{ text: `解答以下問題：\n${q || "請解析圖片內容"}\n需要時請使用 \`\`\`mermaid 繪製架構圖。` }];
+                wolframResultImg.style.display = 'none'; 
+                resultDiv.style.display = 'block'; 
+                statusText.innerText = '💡 Gemini 正在分析您的問題與圖片...';
+                
+                let parts = [{ text: `解答以下問題：\n${q || "請解析這張圖片的內容"}\n需要時請使用 \`\`\`mermaid 繪製架構圖。` }];
                 if (hasImg) {
                     const b64 = await fileToBase64(qaPhotoFile.files[0]);
                     parts.push({ inlineData: { mimeType: "image/jpeg", data: b64 } });
@@ -394,30 +393,54 @@
             } 
             else if (engine === "wolfram") {
                 if (!wolframKeyInput.value) return alert("請輸入 Wolfram AppID！");
+                
                 if (hasImg) {
-                    wolframResultImg.style.display = 'none'; resultDiv.style.display = 'block'; statusText.innerText = '👀 辨識圖片算式...';
+                    // Wolfram + 圖片：先讓 Gemini 萃取算式，再交給 Wolfram
+                    resultDiv.style.display = 'block'; 
+                    wolframResultImg.style.display = 'none'; 
+                    statusText.innerText = '👀 正在請 Gemini 讀取圖片中的算式...';
+                    
                     try {
                         const b64 = await fileToBase64(qaPhotoFile.files[0]);
                         const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$){apiKeyInput.value.trim()}`, {
                             method: 'POST', headers: { 'Content-Type': 'application/json' }, 
-                            body: JSON.stringify({ contents: [{ parts: [{text: "Extract ONLY the math expression. NO markdown."}, { inlineData: { mimeType: "image/jpeg", data: b64 } }] }] })
+                            body: JSON.stringify({ contents: [{ parts: [{text: "Extract ONLY the math expression in plain text (e.g. x^2+5x=0). NO markdown."}, { inlineData: { mimeType: "image/jpeg", data: b64 } }] }] })
                         });
                         const data = await res.json();
                         if(data.error) throw new Error(data.error.message);
+                        
                         const eq = data.candidates[0].content.parts[0].text.trim() + (q ? " " + q : "");
-                        statusText.innerText = `🧮 辨識成功。計算中...`; resultDiv.style.display = 'none'; wolframResultImg.style.display = 'block'; 
+                        statusText.innerText = `🧮 辨識成功：${eq}。正在交由 Wolfram 計算...`; 
+                        resultDiv.style.display = 'none'; 
+                        wolframResultImg.style.display = 'block'; 
+                        
                         wolframResultImg.src = `[https://api.wolframalpha.com/v1/simple?appid=$](https://api.wolframalpha.com/v1/simple?appid=$){wolframKeyInput.value.trim()}&i=${encodeURIComponent(eq)}&background=white&fontsize=16`;
-                        wolframResultImg.onload = () => { statusText.innerText = '✅ 計算完成！'; currentSummaryText = `📝 算式：\n${eq}`; actionGroup.classList.remove('hidden'); };
+                        wolframResultImg.onload = () => { 
+                            statusText.innerText = '✅ Wolfram 計算完成！'; 
+                            currentSummaryText = `📝 算式：\n${eq}`; 
+                            actionGroup.classList.remove('hidden'); 
+                        };
                     } catch(e) { 
                         statusText.innerText = '❌ 辨識失敗'; 
                         resultDiv.style.display = 'block';
                         resultDiv.innerHTML = `<span style="color:red;">錯誤原因：${e.message || '未知錯誤'}</span>`;
                     }
                 } else {
-                    resultDiv.style.display = 'none'; wolframResultImg.style.display = 'block'; statusText.innerText = '🧮 計算中...';
+                    // 純文字交給 Wolfram
+                    resultDiv.style.display = 'none'; 
+                    wolframResultImg.style.display = 'block'; 
+                    statusText.innerText = '🧮 Wolfram 計算中...';
+                    
                     wolframResultImg.src = `[https://api.wolframalpha.com/v1/simple?appid=$](https://api.wolframalpha.com/v1/simple?appid=$){wolframKeyInput.value.trim()}&i=${encodeURIComponent(q)}&background=white&fontsize=16`;
-                    wolframResultImg.onload = () => { statusText.innerText = '✅ 計算完成！'; currentSummaryText = `問題：\n${q}`; actionGroup.classList.remove('hidden'); };
-                    wolframResultImg.onerror = () => { statusText.innerText = '❌ 計算失敗，請檢查算式'; wolframResultImg.style.display = 'none'; };
+                    wolframResultImg.onload = () => { 
+                        statusText.innerText = '✅ Wolfram 計算完成！'; 
+                        currentSummaryText = `問題：\n${q}`; 
+                        actionGroup.classList.remove('hidden'); 
+                    };
+                    wolframResultImg.onerror = () => { 
+                        statusText.innerText = '❌ 計算失敗，請檢查算式'; 
+                        wolframResultImg.style.display = 'none'; 
+                    };
                 }
             }
         };
