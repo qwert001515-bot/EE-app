@@ -31,7 +31,6 @@
         .action-group button { padding: 12px; font-size: 14px; margin-top: 0; flex: 1; }
         .btn-green { background-color: #28a745; } .btn-pink { background-color: #e83e8c; } .btn-yellow { background-color: #ffc107; color: #212529; }
         
-        /* 圖書庫專用 UI */
         .library-box { background: #e9ecef; padding: 12px; border-radius: 8px; margin-top: 10px; }
         .file-list { max-height: 120px; overflow-y: auto; background: white; border-radius: 6px; border: 1px solid #ced4da; margin-top: 10px; }
         .file-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid #eee; font-size: 14px; }
@@ -47,7 +46,9 @@
         .mermaid { text-align: center; margin: 15px 0; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         #wolframResult { max-width: 100%; border-radius: 8px; display: none; margin-top: 10px; }
         .hidden { display: none !important; }
-        .footer-counter { text-align: center; margin-top: 30px; margin-bottom: 30px; font-size: 14px; color: #888; }
+        
+        .footer-counter { text-align: center; margin-top: 40px; margin-bottom: 50px; font-size: 14px; color: #888; }
+        .footer-counter img { margin-top: 8px; max-width: 100%; height: auto; }
     </style>
 </head>
 <body>
@@ -87,7 +88,7 @@
         <button class="tab-btn" id="tabQA" onclick="switchTab('qa')">💬 圖文問答</button>
     </div>
 
-    <!-- 區域 1：聽課錄音 (含 IndexedDB 全域書庫) -->
+    <!-- 區域 1：聽課錄音 -->
     <div class="container" id="sectionBook">
         <div class="input-group">
             <label>⚙️ 選擇錄音模式：</label>
@@ -128,7 +129,7 @@
         <button class="btn-purple" id="analyzePhotoBtn">🚀 讓 AI 幫我解題</button>
     </div>
 
-    <!-- 區域 3：圖文雙核問答 -->
+    <!-- 區域 3：圖文雙核問答 (已把文字輸入框完整補回) -->
     <div class="container hidden" id="sectionQA">
         <div class="input-group">
             <label>⚙️ 選擇計算引擎：</label>
@@ -143,13 +144,12 @@
             <img id="qaImagePreview" class="img-preview" alt="預覽圖片" />
         </div>
         <div class="input-group" style="margin-top:10px;">
-            <label>💬 輸入問題或數學式：</label>
-            <textarea id="questionText" rows="3" placeholder="例如：這張電路圖的戴維寧等效電壓是多少？"></textarea>
+            <label>💬 輸入你的問題或數學式：</label>
+            <textarea id="questionText" rows="3" placeholder="例如：這張電路圖的戴維寧等效電壓是多少？或輸入 solve x^2-4=0"></textarea>
         </div>
         <button class="btn-orange" id="askBtn">🚀 送出問題與計算</button>
     </div>
 
-    <!-- 狀態列與操作區 -->
     <div class="container" style="background: transparent; box-shadow: none; padding: 0;">
         <div id="status">請選擇上方功能開始學習</div>
         <audio id="audioPlayback" controls></audio>
@@ -161,7 +161,6 @@
         </div>
     </div>
 
-    <!-- 結果區 -->
     <div class="result-box">
         <h3>📝 學習成果</h3>
         <div id="result"><span style="color:#6c757d;">產出內容會顯示在這裡...</span></div>
@@ -170,13 +169,12 @@
 
     <div class="footer-counter">
         <p>⚡ 學習器系統運作中</p>
-        <img src="https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https://qwert001515-bot.github.io/EE-app/&count_bg=%23007bff&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=計數器" alt="計數器">
+        <img src="https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https://qwert001515-bot.github.io/EE-app/&count_bg=%23007bff&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=計數器" alt="計數器" onerror="this.style.display='none';">
     </div>
 
     <script>
         mermaid.initialize({ startOnLoad: false, theme: 'default' });
 
-        // --- 🔑 自動記憶金鑰系統 ---
         const apiKeyInput = document.getElementById('apiKey');
         const wolframKeyInput = document.getElementById('wolframKey');
         if (localStorage.getItem('ee_gemini_key')) apiKeyInput.value = localStorage.getItem('ee_gemini_key');
@@ -184,7 +182,6 @@
         apiKeyInput.addEventListener('input', e => localStorage.setItem('ee_gemini_key', e.target.value.trim()));
         wolframKeyInput.addEventListener('input', e => localStorage.setItem('ee_wolfram_key', e.target.value.trim()));
 
-        // --- 🗂️ IndexedDB 電子書庫系統 ---
         const dbName = "EE_Library_DB", storeName = "files";
         function initDB() {
             return new Promise((resolve, reject) => {
@@ -232,7 +229,6 @@
         });
         window.onload = refreshLibrary;
 
-        // --- 🍅 番茄鐘 ---
         let pomoInterval, pomoTimeLeft = 25 * 60, isPomoRunning = false;
         function updTimer() { document.getElementById('timerDisplay').innerText = `${Math.floor(pomoTimeLeft/60).toString().padStart(2,'0')}:${(pomoTimeLeft%60).toString().padStart(2,'0')}`; }
         document.getElementById('pomoStartBtn').onclick = () => {
@@ -248,7 +244,6 @@
         };
         document.getElementById('pomoResetBtn').onclick = () => { clearInterval(pomoInterval); isPomoRunning = false; pomoTimeLeft = 25 * 60; updTimer(); document.getElementById('pomoStartBtn').innerText = '▶️ 開始'; };
 
-        // --- UI 切換邏輯 ---
         function toggleFileUI() { document.getElementById('fileUploadGroup').classList.toggle('hidden', document.getElementById('recordModeSelect').value !== 'book'); }
         function switchTab(mode) {
             ['tabBook', 'tabHomework', 'tabQA'].forEach(id => document.getElementById(id).classList.remove('active'));
@@ -257,12 +252,10 @@
             document.getElementById('section'+mode.charAt(0).toUpperCase()+mode.slice(1)).classList.remove('hidden');
         }
 
-        // --- 共用基礎 ---
         let mediaRecorder, audioChunks = [], currentAudioBlob = null, currentSummaryText = "", currentMode = "學習筆記";
         const statusText = document.getElementById('status'), resultDiv = document.getElementById('result'), wolframResultImg = document.getElementById('wolframResult'), actionGroup = document.getElementById('actionGroup'), audioPlayback = document.getElementById('audioPlayback');
         function fileToBase64(file) { return new Promise(r => { const rd = new FileReader(); rd.onloadend = () => r(rd.result.split(',')[1]); rd.readAsDataURL(file); }); }
         
-        // --- 渲染 Markdown + Mermaid ---
         function renderResult(text) {
             resultDiv.innerHTML = marked.parse(text);
             document.querySelectorAll('code.language-mermaid').forEach(b => {
@@ -272,9 +265,6 @@
             setTimeout(() => mermaid.init(undefined, document.querySelectorAll('.mermaid')), 100);
         }
 
-        // ==========================================
-        // 模式 1：聽課錄音 
-        // ==========================================
         const recordBtn = document.getElementById('recordBtn'), stopBtn = document.getElementById('stopBtn');
         recordBtn.onclick = async () => {
             if (!apiKeyInput.value) return alert("請輸入 Gemini 金鑰！");
@@ -303,9 +293,6 @@
             callGeminiAPI(parts);
         }
 
-        // ==========================================
-        // 模式 2：拍照解題 
-        // ==========================================
         const photoFile = document.getElementById('photoFile'), imgPrev = document.getElementById('imagePreview');
         photoFile.onchange = e => { if (e.target.files.length) { imgPrev.src = URL.createObjectURL(e.target.files[0]); imgPrev.style.display = 'block'; } };
         document.getElementById('analyzePhotoBtn').onclick = async () => {
@@ -336,9 +323,6 @@
             }
         };
 
-        // ==========================================
-        // 模式 3：圖文雙核問答
-        // ==========================================
         const qaPhotoFile = document.getElementById('qaPhotoFile'), qaImgPrev = document.getElementById('qaImagePreview');
         qaPhotoFile.onchange = e => { if (e.target.files.length) { qaImgPrev.src = URL.createObjectURL(e.target.files[0]); qaImgPrev.style.display = 'block'; } };
         
@@ -380,7 +364,6 @@
             }
         };
 
-        // --- 核心 API ---
         async function callGeminiAPI(parts) {
             resultDiv.style.display = 'block';
             try {
@@ -395,7 +378,6 @@
             } catch (e) { statusText.innerText = '❌ 處理失敗'; recordBtn.style.display = 'block'; }
         }
 
-        // --- 三大附加功能 ---
         document.getElementById('cloudBtn').onclick = async () => {
             if (!currentSummaryText) return;
             let files = [new File([currentSummaryText], `筆記_${Date.now()}.txt`, { type: 'text/plain' })];
