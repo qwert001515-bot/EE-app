@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>學習器 (Pro 穩定版)</title>
+    <title>學習器 (標準相容版)</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
     <style>
@@ -53,7 +53,7 @@
 </head>
 <body>
 
-    <h2>⚡ 學習器 (穩定版)</h2>
+    <h2>⚡ 學習器 (標準相容版)</h2>
     
     <div class="pomodoro-bar">
         🍅 專注計時：<span id="timerDisplay">25:00</span>
@@ -117,7 +117,7 @@
         <div class="input-group">
             <label>⚙️ 選擇看圖引擎：</label>
             <select id="hwEngineSelect">
-                <option value="gemini">🧠 Gemini 2.5 Flash (全能解析、解題、讀圖)</option>
+                <option value="gemini">🧠 Gemini 1.5 Flash (標準圖像解析)</option>
                 <option value="wolfram">🧮 Wolfram (拍微積分/方程式，AI代轉 Wolfram計算)</option>
             </select>
         </div>
@@ -134,7 +134,7 @@
         <div class="input-group">
             <label>⚙️ 選擇引擎：</label>
             <select id="engineSelect">
-                <option value="gemini">🧠 Gemini 2.5 Flash (全能解析、解題、讀圖)</option>
+                <option value="gemini">🧠 Gemini 1.5 Flash (標準圖像解析)</option>
                 <option value="wolfram">🧮 WolframAlpha (微積分、解方程式、畫圖)</option>
             </select>
         </div>
@@ -267,7 +267,7 @@
                         try {
                             const canvas = document.createElement('canvas');
                             let w = img.width, h = img.height;
-                            const max = 1200;
+                            const max = 1000;
                             if (w > h && w > max) { h *= max / w; w = max; }
                             else if (h > max) { w *= max / h; h = max; }
                             canvas.width = w; canvas.height = h;
@@ -365,12 +365,12 @@
                 const fileData = await convertImageToTrueJPEG(photoFile.files[0]);
 
                 if (hwEngine === 'gemini') {
-                    wolframResultImg.style.display = 'none'; resultDiv.style.display = 'block'; statusText.innerText = '🧠 Gemini 2.5 Flash 解析中...';
+                    wolframResultImg.style.display = 'none'; resultDiv.style.display = 'block'; statusText.innerText = '🧠 Gemini 1.5 Flash 解析中...';
                     callGeminiAPI([{ text: "給出詳細解題步驟，需要時用 ```mermaid 畫圖表。" }, { inlineData: fileData }]);
                 } else {
                     wolframResultImg.style.display = 'none'; resultDiv.style.display = 'block'; statusText.innerText = '👀 辨識數學式...'; resultDiv.innerHTML = '影像處理中...';
                     try {
-                        const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$){apiKeyInput.value.trim()}`, {
+                        const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$){apiKeyInput.value.trim()}`, {
                             method: 'POST', headers: { 'Content-Type': 'application/json' }, 
                             body: JSON.stringify({ contents: [{ parts: [{text: "Extract ONLY the math expression in plain text (e.g. x^2+5x=0). NO markdown."}, { inlineData: fileData }] }] })
                         });
@@ -403,7 +403,7 @@
             try {
                 if (engine === "gemini") {
                     if (!apiKeyInput.value) return alert("請輸入 Google Gemini 金鑰！");
-                    wolframResultImg.style.display = 'none'; resultDiv.style.display = 'block'; statusText.innerText = '💡 Gemini 2.5 Flash 正在分析您的問題與圖片...';
+                    wolframResultImg.style.display = 'none'; resultDiv.style.display = 'block'; statusText.innerText = '💡 Gemini 1.5 Flash 正在分析您的問題與圖片...';
                     
                     let parts = [{ text: `解答以下問題：\n${q || "請解析這張圖片的電路原理或內容"}\n需要時請使用 \`\`\`mermaid 繪製架構圖。` }];
                     if (hasImg) {
@@ -411,7 +411,7 @@
                         const fileData = await convertImageToTrueJPEG(qaPhotoFile.files[0]);
                         parts.push({ inlineData: fileData });
                     }
-                    statusText.innerText = '💡 Gemini 2.5 Flash 正在分析您的問題與圖片...';
+                    statusText.innerText = '💡 Gemini 1.5 Flash 正在分析您的問題與圖片...';
                     callGeminiAPI(parts);
                 } 
                 else if (engine === "wolfram") {
@@ -423,7 +423,7 @@
                         try {
                             const fileData = await convertImageToTrueJPEG(qaPhotoFile.files[0]);
                             statusText.innerText = '👀 正在請 Gemini 讀取圖片中的算式...';
-                            const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$){apiKeyInput.value.trim()}`, {
+                            const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$){apiKeyInput.value.trim()}`, {
                                 method: 'POST', headers: { 'Content-Type': 'application/json' }, 
                                 body: JSON.stringify({ contents: [{ parts: [{text: "Extract ONLY the math expression in plain text (e.g. x^2+5x=0). NO markdown."}, { inlineData: fileData }] }] })
                             });
@@ -452,7 +452,7 @@
         async function callGeminiAPI(parts) {
             resultDiv.style.display = 'block';
             try {
-                const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$){apiKeyInput.value.trim()}`, {
+                const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$){apiKeyInput.value.trim()}`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: parts }] })
                 });
                 const data = await res.json();
@@ -489,7 +489,7 @@
             if (!currentSummaryText || !apiKeyInput.value) return;
             statusText.innerText = '⏳ 製作閃卡中...';
             try {
-                const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$){apiKeyInput.value.trim()}`, {
+                const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$){apiKeyInput.value.trim()}`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: `嚴格以 CSV 格式輸出5題問答 (問題,答案)。內容：\n${currentSummaryText}` }] }] })
                 });
                 const data = await res.json();
