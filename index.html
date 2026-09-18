@@ -3,9 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>學習器 (穩定終極版)</title>
+    <title>學習器 (SDK 完整全功能版)</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <!-- 引入 Google 官方 Gen AI SDK -->
+    <script type="importmap">
+      {
+        "imports": {
+          "@google/genai": "https://esm.run/@google/genai"
+        }
+      }
+    </script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; max-width: 600px; margin: auto; line-height: 1.6; background-color: #f4f6f9; color: #333; }
         h2 { text-align: center; color: #2c3e50; font-weight: bold; margin-bottom: 10px; }
@@ -25,7 +33,7 @@
         
         button { padding: 15px; font-size: 16px; border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; width: 100%; transition: 0.3s; margin-top: 5px; }
         .btn-blue { background-color: #007bff; } .btn-red { background-color: #dc3545; display: none; }
-        .btn-purple { background-color: #6f42c1; } .btn-orange { background-color: #fd7e14; }
+        .btn-purple { background-color: #6f42c1; } .btn-teal { background-color: #17a2b8; } .btn-orange { background-color: #fd7e14; }
         
         .action-group { display: flex; gap: 8px; margin-top: 10px; }
         .action-group button { padding: 12px; font-size: 14px; margin-top: 0; flex: 1; }
@@ -33,6 +41,7 @@
         
         #status { text-align: center; font-size: 15px; color: #6c757d; font-weight: bold; margin-top: 10px; }
         #audioPlayback { width: 100%; display: none; margin-top: 10px; border-radius: 8px; }
+        .img-preview { max-width: 100%; border-radius: 8px; display: none; margin-top: 10px; border: 1px solid #dee2e6; }
         
         .result-box { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
         h3 { color: #2c3e50; margin-top: 0; border-bottom: 2px solid #e9ecef; padding-bottom: 5px; }
@@ -47,7 +56,7 @@
 </head>
 <body>
 
-    <h2>⚡ 學習器 (穩定終極版)</h2>
+    <h2>⚡ 學習器 (全功能 SDK 版)</h2>
     
     <div class="pomodoro-bar">
         🍅 專注計時：<span id="timerDisplay">25:00</span>
@@ -78,7 +87,8 @@
 
     <div class="tab-container">
         <button class="tab-btn active" id="tabBook" onclick="switchTab('book')">🎙️ 聽課錄音</button>
-        <button class="tab-btn" id="tabQA" onclick="switchTab('qa')">💬 文字與數學問答</button>
+        <button class="tab-btn" id="tabHomework" onclick="switchTab('homework')">📸 雙核拍照</button>
+        <button class="tab-btn" id="tabQA" onclick="switchTab('qa')">💬 圖文問答解題</button>
     </div>
 
     <!-- 區域 1：聽課錄音 -->
@@ -87,18 +97,40 @@
         <button class="btn-red" id="stopBtn">⏹️ 停止錄音並總結</button>
     </div>
 
-    <!-- 區域 2：文字與數學問答 -->
+    <!-- 區域 2：拍照解題 -->
+    <div class="container hidden" id="sectionHomework">
+        <div class="input-group">
+            <label>⚙️ 選擇看圖引擎：</label>
+            <select id="hwEngineSelect">
+                <option value="gemini">🧠 Gemini 1.5 Flash (看電路圖、推導步驟)</option>
+                <option value="wolfram">🧮 Wolfram (拍微積分/方程式，AI代轉計算)</option>
+            </select>
+        </div>
+        <div class="input-group" style="margin-top: 10px;">
+            <label>📸 上傳作業相片：</label>
+            <input type="file" id="photoFile" accept="image/*" />
+            <img id="imagePreview" class="img-preview" alt="預覽圖片" />
+        </div>
+        <button class="btn-purple" id="analyzePhotoBtn">🚀 讓 AI 幫我解題</button>
+    </div>
+
+    <!-- 區域 3：圖文雙核問答 -->
     <div class="container hidden" id="sectionQA">
         <div class="input-group">
-            <label>⚙️ 選擇計算引擎：</label>
+            <label>⚙️ 選擇引擎：</label>
             <select id="engineSelect">
-                <option value="gemini">🧠 Gemini 1.5 Flash (觀念解釋、問答)</option>
-                <option value="wolfram">🧮 WolframAlpha (微積分、解方程式、畫圖)</option>
+                <option value="gemini">🧠 Gemini 1.5 Flash (圖文觀念解析)</option>
+                <option value="wolfram">🧮 WolframAlpha (微積分、解方程式)</option>
             </select>
         </div>
         <div class="input-group" style="margin-top:10px;">
-            <label>💬 輸入你的問題或數學式：</label>
-            <textarea id="questionText" rows="3" placeholder="例如：解釋戴維寧等效電壓定理，或輸入 solve x^2-4=0"></textarea>
+            <label>📸 (選填) 上傳補充圖片：</label>
+            <input type="file" id="qaPhotoFile" accept="image/*" />
+            <img id="qaImagePreview" class="img-preview" alt="預覽圖片" />
+        </div>
+        <div class="input-group" style="margin-top:10px;">
+            <label>💬 輸入問題或數學式：</label>
+            <textarea id="questionText" rows="3" placeholder="例如：這張電路圖的戴維寧等效電壓是多少？"></textarea>
         </div>
         <button class="btn-orange" id="askBtn">🚀 送出問題與計算</button>
     </div>
@@ -125,7 +157,9 @@
         <img src="https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https://qwert001515-bot.github.io/EE-app/&count_bg=%23007bff&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=計數器" alt="計數器" onerror="this.style.display='none';">
     </div>
 
-    <script>
+    <script type="module">
+        import { GoogleGenAI } from "@google/genai";
+
         mermaid.initialize({ startOnLoad: false, theme: 'default' });
 
         const apiKeyInput = document.getElementById('apiKey');
@@ -150,12 +184,13 @@
         };
         document.getElementById('pomoResetBtn').onclick = () => { clearInterval(pomoInterval); isPomoRunning = false; pomoTimeLeft = 25 * 60; updTimer(); document.getElementById('pomoStartBtn').innerText = '▶️ 開始'; };
 
-        function switchTab(mode) {
-            ['tabBook', 'tabQA'].forEach(id => document.getElementById(id).classList.remove('active'));
-            ['sectionBook', 'sectionQA'].forEach(id => document.getElementById(id).classList.add('hidden'));
+        window.switchTab = function(mode) {
+            ['tabBook', 'tabHomework', 'tabQA'].forEach(id => document.getElementById(id).classList.remove('active'));
+            ['sectionBook', 'sectionHomework', 'sectionQA'].forEach(id => document.getElementById(id).classList.add('hidden'));
             
             if (mode === 'book') { document.getElementById('tabBook').classList.add('active'); document.getElementById('sectionBook').classList.remove('hidden'); document.getElementById('status').innerText = '準備就緒，可開始錄音。'; } 
-            else if (mode === 'qa') { document.getElementById('tabQA').classList.add('active'); document.getElementById('sectionQA').classList.remove('hidden'); document.getElementById('status').innerText = '問答模式已啟動，請輸入問題或數學式。'; }
+            else if (mode === 'homework') { document.getElementById('tabHomework').classList.add('active'); document.getElementById('sectionHomework').classList.remove('hidden'); document.getElementById('status').innerText = '請選擇看圖引擎並上傳作業相片。'; } 
+            else if (mode === 'qa') { document.getElementById('tabQA').classList.add('active'); document.getElementById('sectionQA').classList.remove('hidden'); document.getElementById('status').innerText = '圖文問答模式已啟動。'; }
         }
 
         let mediaRecorder, audioChunks = [], currentAudioBlob = null, currentSummaryText = "";
@@ -168,6 +203,40 @@
                 b.parentNode.replaceWith(d);
             });
             setTimeout(() => mermaid.init(undefined, document.querySelectorAll('.mermaid')), 100);
+        }
+
+        // 圖片轉 SDK 標準格式
+        function fileToGenerativePart(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        let w = img.width, h = img.height;
+                        const max = 1000;
+                        if (w > h && w > max) { h *= max / w; w = max; }
+                        else if (h > max) { w *= max / h; h = max; }
+                        canvas.width = w; canvas.height = h;
+                        const ctx = canvas.getContext('2d');
+                        ctx.fillStyle = "#ffffff";
+                        ctx.fillRect(0, 0, w, h);
+                        ctx.drawImage(img, 0, 0, w, h);
+                        
+                        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                        resolve({
+                            inlineData: {
+                                data: dataUrl.split(',')[1],
+                                mimeType: "image/jpeg"
+                            },
+                        });
+                    };
+                    img.onerror = () => reject("圖片載入失敗");
+                    img.src = e.target.result;
+                };
+                reader.onerror = () => reject("讀取檔案失敗");
+                reader.readAsDataURL(file);
+            });
         }
 
         const recordBtn = document.getElementById('recordBtn'), stopBtn = document.getElementById('stopBtn');
@@ -188,57 +257,116 @@
             currentAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
             audioPlayback.src = URL.createObjectURL(currentAudioBlob); audioPlayback.style.display = 'block';
             let pText = `整理「${document.getElementById('courseType').value}」課程的錄音重點摘要與觀念。若遇邏輯流程請用 \`\`\`mermaid 繪圖。`;
-            callSafeGeminiAPI(pText);
+            callGeminiSDK([pText]);
         }
 
+        const photoFile = document.getElementById('photoFile'), imgPrev = document.getElementById('imagePreview');
+        photoFile.onchange = e => { if (e.target.files.length) { imgPrev.src = URL.createObjectURL(e.target.files[0]); imgPrev.style.display = 'block'; } };
+        
+        document.getElementById('analyzePhotoBtn').onclick = async () => {
+            const hwEngine = document.getElementById('hwEngineSelect').value;
+            const cleanKey = apiKeyInput.value.trim();
+            if (!cleanKey) return alert("Gemini 金鑰必填！");
+            if (hwEngine === 'wolfram' && !wolframKeyInput.value.trim()) return alert("Wolfram 金鑰必填！");
+            if (!photoFile.files.length) return alert("請先選擇圖片！");
+            
+            actionGroup.classList.add('hidden');
+            try {
+                statusText.innerText = '⚙️ 處理圖片中...';
+                const imagePart = await fileToGenerativePart(photoFile.files[0]);
+
+                if (hwEngine === 'gemini') {
+                    wolframResultImg.style.display = 'none'; resultDiv.style.display = 'block'; statusText.innerText = '🧠 Gemini 1.5 Flash 解析中...';
+                    await callGeminiSDK(["請詳細解答這張作業或電路圖，需要時使用 ```mermaid 繪製圖表。", imagePart]);
+                } else {
+                    wolframResultImg.style.display = 'none'; resultDiv.style.display = 'block'; statusText.innerText = '👀 辨識數學式...';
+                    const ai = new GoogleGenAI({ apiKey: cleanKey });
+                    const response = await ai.models.generateContent({
+                        model: 'gemini-1.5-flash',
+                        contents: [{ role: 'user', parts: [{text: "Extract ONLY the math expression in plain text (e.g. x^2+5x=0). NO markdown."}, imagePart] }]
+                    });
+                    const eq = response.text.trim();
+                    statusText.innerText = `🧮 辨識成功：${eq}。計算中...`; resultDiv.style.display = 'none'; wolframResultImg.style.display = 'block'; 
+                    wolframResultImg.src = `[https://api.wolframalpha.com/v1/simple?appid=$](https://api.wolframalpha.com/v1/simple?appid=$){wolframKeyInput.value.trim()}&i=${encodeURIComponent(eq)}&background=white&fontsize=16`;
+                    wolframResultImg.onload = () => { statusText.innerText = '✅ 計算完成！'; currentSummaryText = `📝 算式：\n${eq}\n(見圖)`; actionGroup.classList.remove('hidden'); };
+                    wolframResultImg.onerror = () => { statusText.innerText = '❌ Wolfram 計算載入失敗'; wolframResultImg.style.display = 'none'; };
+                }
+            } catch (error) {
+                statusText.innerText = '❌ 處理失敗'; resultDiv.style.display = 'block'; resultDiv.innerHTML = `<span style="color:red;">錯誤：${error}</span>`;
+            }
+        };
+
+        const qaPhotoFile = document.getElementById('qaPhotoFile'), qaImgPrev = document.getElementById('qaImagePreview');
+        qaPhotoFile.onchange = e => { if (e.target.files.length) { qaImgPrev.src = URL.createObjectURL(e.target.files[0]); qaImgPrev.style.display = 'block'; } };
+        
         document.getElementById('askBtn').onclick = async () => {
             const q = document.getElementById('questionText').value.trim();
+            const hasImg = qaPhotoFile.files.length > 0;
             const cleanKey = apiKeyInput.value.trim();
-            if (!q) return alert("請輸入問題或數學式！");
+            if (!q && !hasImg) return alert("請輸入問題或上傳圖片！");
             
             const engine = document.getElementById('engineSelect').value;
-            currentAudioBlob = null; audioPlayback.style.display = 'none'; actionGroup.classList.add('hidden');
+            actionGroup.classList.add('hidden');
 
             try {
                 if (engine === "gemini") {
                     if (!cleanKey) return alert("請輸入 Google Gemini 金鑰！");
-                    wolframResultImg.style.display = 'none'; resultDiv.style.display = 'block'; statusText.innerText = '💡 Gemini 正在分析您的問題...';
-                    callSafeGeminiAPI(q);
+                    wolframResultImg.style.display = 'none'; resultDiv.style.display = 'block'; statusText.innerText = '💡 Gemini 正在分析...';
+                    
+                    let parts = [q || "請解析這張圖片的原理或內容，需要時使用 ```mermaid 繪製架構圖。"];
+                    if (hasImg) {
+                        statusText.innerText = '⚙️ 處理圖片中...';
+                        const imagePart = await fileToGenerativePart(qaPhotoFile.files[0]);
+                        parts.push(imagePart);
+                    }
+                    statusText.innerText = '💡 Gemini 正在分析...';
+                    await callGeminiSDK(parts);
                 } 
                 else if (engine === "wolfram") {
                     if (!wolframKeyInput.value.trim()) return alert("請輸入 WolframAlpha AppID！");
-                    resultDiv.style.display = 'none'; wolframResultImg.style.display = 'block'; statusText.innerText = '🧮 Wolfram 計算中...';
                     
-                    wolframResultImg.src = `https://api.wolframalpha.com/v1/simple?appid=${wolframKeyInput.value.trim()}&i=${encodeURIComponent(q)}&background=white&fontsize=16`;
-                    wolframResultImg.onload = () => { statusText.innerText = '✅ Wolfram 計算完成！'; currentSummaryText = `問題：\n${q}`; actionGroup.classList.remove('hidden'); };
-                    wolframResultImg.onerror = () => { statusText.innerText = '❌ 計算失敗，請檢查算式'; wolframResultImg.style.display = 'none'; };
+                    if (hasImg) {
+                        resultDiv.style.display = 'block'; wolframResultImg.style.display = 'none'; 
+                        statusText.innerText = '👀 讀取圖中算式...';
+                        const imagePart = await fileToGenerativePart(qaPhotoFile.files[0]);
+                        const ai = new GoogleGenAI({ apiKey: cleanKey });
+                        const response = await ai.models.generateContent({
+                            model: 'gemini-1.5-flash',
+                            contents: [{ role: 'user', parts: [{text: "Extract ONLY the math expression in plain text (e.g. x^2+5x=0). NO markdown."}, imagePart] }]
+                        });
+                        const eq = response.text.trim() + (q ? " " + q : "");
+                        statusText.innerText = `🧮 計算中：${eq}`; resultDiv.style.display = 'none'; wolframResultImg.style.display = 'block'; 
+                        
+                        wolframResultImg.src = `https://api.wolframalpha.com/v1/simple?appid=${wolframKeyInput.value.trim()}&i=${encodeURIComponent(eq)}&background=white&fontsize=16`;
+                        wolframResultImg.onload = () => { statusText.innerText = '✅ 計算完成！'; currentSummaryText = `📝 算式：\n${eq}`; actionGroup.classList.remove('hidden'); };
+                    } else {
+                        resultDiv.style.display = 'none'; wolframResultImg.style.display = 'block'; statusText.innerText = '🧮 Wolfram 計算中...';
+                        wolframResultImg.src = `https://api.wolframalpha.com/v1/simple?appid=${wolframKeyInput.value.trim()}&i=${encodeURIComponent(q)}&background=white&fontsize=16`;
+                        wolframResultImg.onload = () => { statusText.innerText = '✅ 計算完成！'; currentSummaryText = `問題：\n${q}`; actionGroup.classList.remove('hidden'); };
+                    }
                 }
             } catch (error) {
-                statusText.innerText = '❌ 處理失敗'; resultDiv.style.display = 'block'; resultDiv.innerHTML = `<span style="color:red; font-weight:bold;">🚨 錯誤：${error}</span>`;
+                statusText.innerText = '❌ 處理失敗'; resultDiv.style.display = 'block'; resultDiv.innerHTML = `<span style="color:red;">錯誤：${error}</span>`;
             }
         };
 
-        async function callSafeGeminiAPI(promptText) {
+        async function callGeminiSDK(partsArray) {
             resultDiv.style.display = 'block';
             try {
                 const cleanKey = apiKeyInput.value.trim();
                 if (!cleanKey) throw new Error("請先輸入 Gemini 金鑰");
 
-                const apiUrl = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=" + encodeURIComponent(cleanKey);
-
-                const res = await fetch(apiUrl, {
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
+                const ai = new GoogleGenAI({ apiKey: cleanKey });
+                const response = await ai.models.generateContent({
+                    model: 'gemini-1.5-flash',
+                    contents: [{ role: 'user', parts: partsArray }]
                 });
-                const data = await res.json();
-                if (data.error) throw new Error(data.error.message);
-                currentSummaryText = data.candidates[0].content.parts[0].text;
+                currentSummaryText = response.text;
                 renderResult(currentSummaryText);
                 statusText.innerText = '✅ 處理完成！'; actionGroup.classList.remove('hidden'); recordBtn.style.display = 'block';
             } catch (e) { 
                 statusText.innerText = '❌ 處理失敗'; 
-                resultDiv.innerHTML = `<span style="color:red;">API 錯誤原因：<br>${e.message}</span>`;
+                resultDiv.innerHTML = `<span style="color:red;">API 錯誤：<br>${e.message}</span>`;
                 recordBtn.style.display = 'block'; 
             }
         }
@@ -266,13 +394,12 @@
             if (!currentSummaryText || !cleanKey) return;
             statusText.innerText = '⏳ 製作閃卡中...';
             try {
-                const apiUrl = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=" + encodeURIComponent(cleanKey);
-                const res = await fetch(apiUrl, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify({ contents: [{ parts: [{ text: `嚴格以 CSV 格式輸出5題問答 (問題,答案)。內容：\n${currentSummaryText}` }] }] })
+                const ai = new GoogleGenAI({ apiKey: cleanKey });
+                const response = await ai.models.generateContent({
+                    model: 'gemini-1.5-flash',
+                    contents: [{ role: 'user', parts: [`嚴格以 CSV 格式輸出5題問答 (問題,答案)。內容：\n${currentSummaryText}`] }]
                 });
-                const data = await res.json();
-                const blob = new Blob(["\uFEFF" + data.candidates[0].content.parts[0].text.replace(/```(csv)?/gi, '').trim()], { type: 'text/csv;charset=utf-8;' });
+                const blob = new Blob(["\uFEFF" + response.text.replace(/```(csv)?/gi, '').trim()], { type: 'text/csv;charset=utf-8;' });
                 const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `閃卡_${Date.now()}.csv`;
                 document.body.appendChild(a); a.click(); document.body.removeChild(a); statusText.innerText = '✅ 閃卡下載成功！';
             } catch(e) { statusText.innerText = '❌ 閃卡失敗。'; }
