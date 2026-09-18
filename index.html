@@ -302,7 +302,7 @@
 
         const recordBtn = document.getElementById('recordBtn'), stopBtn = document.getElementById('stopBtn');
         recordBtn.onclick = async () => {
-            if (!apiKeyInput.value) return alert("請輸入 Gemini 金鑰！");
+            if (!apiKeyInput.value) return alert("請輸入 Google Gemini 金鑰！");
             if (document.getElementById('recordModeSelect').value === 'book' && activeFileSelect.value === 'none') return alert("請先從書庫選擇一本講義！");
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -367,7 +367,7 @@
         qaPhotoFile.onchange = e => { if (e.target.files.length) { qaImgPrev.src = URL.createObjectURL(e.target.files[0]); qaImgPrev.style.display = 'block'; } };
         
         // ==========================================
-        // 修正後的圖文問答送出邏輯 (分開 Gemini 與 Wolfram)
+        // 🛠️ 徹底修復：圖文問答送出邏輯 (完全獨立的分支)
         // ==========================================
         document.getElementById('askBtn').onclick = async () => {
             const q = document.getElementById('questionText').value.trim();
@@ -378,24 +378,25 @@
             currentMode = engine === "gemini" ? "Gemini問答" : "Wolfram計算";
             currentAudioBlob = null; audioPlayback.style.display = 'none'; actionGroup.classList.add('hidden');
 
+            // 1. 如果選擇 Gemini 引擎：直接走純 Gemini 圖文問答，絕不碰 Wolfram
             if (engine === "gemini") {
-                if (!apiKeyInput.value) return alert("請輸入 Gemini 金鑰！");
+                if (!apiKeyInput.value) return alert("請輸入 Google Gemini 金鑰！");
                 wolframResultImg.style.display = 'none'; 
                 resultDiv.style.display = 'block'; 
                 statusText.innerText = '💡 Gemini 正在分析您的問題與圖片...';
                 
-                let parts = [{ text: `解答以下問題：\n${q || "請解析這張圖片的內容"}\n需要時請使用 \`\`\`mermaid 繪製架構圖。` }];
+                let parts = [{ text: `解答以下問題：\n${q || "請解析這張圖片的電路原理或內容"}\n需要時請使用 \`\`\`mermaid 繪製架構圖。` }];
                 if (hasImg) {
                     const b64 = await fileToBase64(qaPhotoFile.files[0]);
                     parts.push({ inlineData: { mimeType: "image/jpeg", data: b64 } });
                 }
                 callGeminiAPI(parts);
             } 
+            // 2. 如果選擇 Wolfram 引擎：才走數學計算
             else if (engine === "wolfram") {
-                if (!wolframKeyInput.value) return alert("請輸入 Wolfram AppID！");
+                if (!wolframKeyInput.value) return alert("請輸入 WolframAlpha AppID！");
                 
                 if (hasImg) {
-                    // Wolfram + 圖片：先讓 Gemini 萃取算式，再交給 Wolfram
                     resultDiv.style.display = 'block'; 
                     wolframResultImg.style.display = 'none'; 
                     statusText.innerText = '👀 正在請 Gemini 讀取圖片中的算式...';
@@ -426,7 +427,6 @@
                         resultDiv.innerHTML = `<span style="color:red;">錯誤原因：${e.message || '未知錯誤'}</span>`;
                     }
                 } else {
-                    // 純文字交給 Wolfram
                     resultDiv.style.display = 'none'; 
                     wolframResultImg.style.display = 'block'; 
                     statusText.innerText = '🧮 Wolfram 計算中...';
