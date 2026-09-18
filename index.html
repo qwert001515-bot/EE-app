@@ -88,7 +88,6 @@
         <button class="tab-btn" id="tabQA" onclick="switchTab('qa')">💬 圖文問答</button>
     </div>
 
-    <!-- 區域 1：聽課錄音 -->
     <div class="container" id="sectionBook">
         <div class="input-group">
             <label>⚙️ 選擇錄音模式：</label>
@@ -97,7 +96,6 @@
                 <option value="book">📖 講義比對模式 (從書庫挑選)</option>
             </select>
         </div>
-        
         <div class="library-box hidden" id="fileUploadGroup">
             <label>📚 我的平板電子書庫：</label>
             <select id="activeFileSelect" style="margin-bottom: 10px;">
@@ -107,12 +105,10 @@
             <button onclick="document.getElementById('libraryUpload').click()" style="background:#28a745; padding: 10px; margin-top: 0;">📥 上傳新講義永久保存</button>
             <div class="file-list" id="fileListUI"></div>
         </div>
-        
         <button class="btn-blue" id="recordBtn">🔴 開始錄音聽課</button>
         <button class="btn-red" id="stopBtn">⏹️ 停止錄音並總結</button>
     </div>
 
-    <!-- 區域 2：拍照解題 -->
     <div class="container hidden" id="sectionHomework">
         <div class="input-group">
             <label>⚙️ 選擇看圖引擎：</label>
@@ -129,7 +125,6 @@
         <button class="btn-purple" id="analyzePhotoBtn">🚀 讓 AI 幫我解題</button>
     </div>
 
-    <!-- 區域 3：圖文雙核問答 -->
     <div class="container hidden" id="sectionQA">
         <div class="input-group">
             <label>⚙️ 選擇計算引擎：</label>
@@ -153,7 +148,6 @@
     <div class="container" style="background: transparent; box-shadow: none; padding: 0;">
         <div id="status">請選擇上方功能開始學習</div>
         <audio id="audioPlayback" controls></audio>
-        
         <div class="action-group hidden" id="actionGroup">
             <button class="btn-green" id="cloudBtn">☁️ 存雲端</button>
             <button class="btn-pink" id="readBtn">🔊 朗讀</button>
@@ -186,9 +180,7 @@
         function initDB() {
             return new Promise((resolve, reject) => {
                 const req = indexedDB.open(dbName, 1);
-                req.onupgradeneeded = e => {
-                    if (!e.target.result.objectStoreNames.contains(storeName)) e.target.result.createObjectStore(storeName, { keyPath: "id" });
-                };
+                req.onupgradeneeded = e => { if (!e.target.result.objectStoreNames.contains(storeName)) e.target.result.createObjectStore(storeName, { keyPath: "id" }); };
                 req.onsuccess = e => resolve(e.target.result); req.onerror = e => reject(e.target.error);
             });
         }
@@ -203,8 +195,7 @@
 
         async function refreshLibrary() {
             const files = await getFilesDB();
-            fileListUI.innerHTML = ''; 
-            activeFileSelect.innerHTML = '<option value="none">請選擇要比對的講義...</option>';
+            fileListUI.innerHTML = ''; activeFileSelect.innerHTML = '<option value="none">請選擇要比對的講義...</option>';
             if(files.length===0) { fileListUI.innerHTML = '<div style="padding:10px;text-align:center;color:#888;font-size:14px;">書庫空空如也</div>'; return; }
             files.forEach(f => {
                 const div = document.createElement('div'); div.className = 'file-item';
@@ -212,7 +203,6 @@
                 const btn = document.createElement('button'); btn.className = 'btn-small-del'; btn.innerText = '刪除';
                 btn.onclick = async () => { if(confirm('確定刪除？')) { await delFileDB(f.id); refreshLibrary(); } };
                 div.appendChild(btn); fileListUI.appendChild(div);
-                
                 const opt = document.createElement('option'); opt.value = f.id; opt.innerText = `📖 ${f.name}`;
                 activeFileSelect.appendChild(opt);
             });
@@ -221,7 +211,7 @@
             if(!e.target.files.length) return;
             document.getElementById('status').innerText = '⏳ 正在存入平板書庫...';
             const f = e.target.files[0];
-            const b64 = await fileToBase64(f);
+            const b64 = await rawFileToBase64(f);
             await saveFileDB({ id: Date.now().toString(), name: f.name, mimeType: f.type || "text/plain", data: b64 });
             await refreshLibrary();
             document.getElementById('status').innerText = '✅ 講義永久儲存成功！';
@@ -248,32 +238,44 @@
         function switchTab(mode) {
             ['tabBook', 'tabHomework', 'tabQA'].forEach(id => document.getElementById(id).classList.remove('active'));
             ['sectionBook', 'sectionHomework', 'sectionQA'].forEach(id => document.getElementById(id).classList.add('hidden'));
-            
-            if (mode === 'book') {
-                document.getElementById('tabBook').classList.add('active');
-                document.getElementById('sectionBook').classList.remove('hidden');
-                document.getElementById('status').innerText = '準備就緒，可開始錄音。';
-            } else if (mode === 'homework') {
-                document.getElementById('tabHomework').classList.add('active');
-                document.getElementById('sectionHomework').classList.remove('hidden');
-                document.getElementById('status').innerText = '請選擇看圖引擎並上傳作業相片。';
-            } else if (mode === 'qa') {
-                document.getElementById('tabQA').classList.add('active');
-                document.getElementById('sectionQA').classList.remove('hidden');
-                document.getElementById('status').innerText = '隨問隨答模式已啟動，請輸入問題或上傳圖片。';
-            }
+            if (mode === 'book') { document.getElementById('tabBook').classList.add('active'); document.getElementById('sectionBook').classList.remove('hidden'); document.getElementById('status').innerText = '準備就緒，可開始錄音。'; } 
+            else if (mode === 'homework') { document.getElementById('tabHomework').classList.add('active'); document.getElementById('sectionHomework').classList.remove('hidden'); document.getElementById('status').innerText = '請選擇看圖引擎並上傳作業相片。'; } 
+            else if (mode === 'qa') { document.getElementById('tabQA').classList.add('active'); document.getElementById('sectionQA').classList.remove('hidden'); document.getElementById('status').innerText = '隨問隨答模式已啟動，請輸入問題或上傳圖片。'; }
         }
 
         let mediaRecorder, audioChunks = [], currentAudioBlob = null, currentSummaryText = "", currentMode = "學習筆記";
         const statusText = document.getElementById('status'), resultDiv = document.getElementById('result'), wolframResultImg = document.getElementById('wolframResult'), actionGroup = document.getElementById('actionGroup'), audioPlayback = document.getElementById('audioPlayback');
         
-        // 🛡️ 最純粹原生讀取：不經過 Canvas，直接把檔案轉 Base64
-        function fileToBase64(file) {
+        // 用於處理非圖片檔（如 PDF）的原始讀取
+        function rawFileToBase64(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
-                reader.onloadend = () => {
-                    const base64String = reader.result.split(',')[1];
-                    resolve(base64String);
+                reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // 🛡️ 穩定的圖片壓縮器：避免 Load failed 網路超載崩潰
+        function fileToBase64Compressed(file) {
+            return new Promise((resolve, reject) => {
+                if (!file.type.startsWith('image/')) { resolve(rawFileToBase64(file)); return; }
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        let width = img.width, height = img.height;
+                        const maxDim = 1000; // 安全壓縮極限
+                        if (width > height && width > maxDim) { height *= maxDim / width; width = maxDim; }
+                        else if (height > maxDim) { width *= maxDim / height; height = maxDim; }
+                        canvas.width = width; canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        resolve(canvas.toDataURL('image/jpeg', 0.7).split(',')[1]);
+                    };
+                    img.onerror = () => resolve(e.target.result.split(',')[1]);
+                    img.src = e.target.result;
                 };
                 reader.onerror = reject;
                 reader.readAsDataURL(file);
@@ -310,7 +312,7 @@
                 const fData = await getFileByIdDB(activeFileSelect.value);
                 if(fData) parts.push({ inlineData: { mimeType: fData.mimeType, data: fData.data } });
             }
-            parts.push({ inlineData: { mimeType: "audio/webm", data: await fileToBase64(currentAudioBlob) } });
+            parts.push({ inlineData: { mimeType: "audio/webm", data: await rawFileToBase64(currentAudioBlob) } });
             let pText = `整理「${document.getElementById('courseType').value}」課程的錄音筆記。若遇邏輯流程請用 \`\`\`mermaid 繪圖。`;
             if (document.getElementById('recordModeSelect').value === 'book') pText += "請比對講義並標示頁碼。";
             parts.unshift({ text: pText });
@@ -327,8 +329,8 @@
             
             currentMode = "拍照解題"; currentAudioBlob = null; audioPlayback.style.display = 'none'; actionGroup.classList.add('hidden');
             const f = photoFile.files[0];
-            const mimeType = f.type || "image/jpeg";
-            const b64 = await fileToBase64(f);
+            const mimeType = "image/jpeg";
+            const b64 = await fileToBase64Compressed(f);
 
             if (hwEngine === 'gemini') {
                 wolframResultImg.style.display = 'none'; resultDiv.style.display = 'block'; statusText.innerText = '🧠 Gemini 解析中...';
@@ -347,10 +349,7 @@
                     wolframResultImg.src = `[https://api.wolframalpha.com/v1/simple?appid=$](https://api.wolframalpha.com/v1/simple?appid=$){wolframKeyInput.value.trim()}&i=${encodeURIComponent(eq)}&background=white&fontsize=16`;
                     wolframResultImg.onload = () => { statusText.innerText = '✅ 計算完成！'; currentSummaryText = `📝 算式：\n${eq}\n(見圖)`; actionGroup.classList.remove('hidden'); };
                     wolframResultImg.onerror = () => { statusText.innerText = '❌ Wolfram 計算載入失敗'; wolframResultImg.style.display = 'none'; };
-                } catch(e) { 
-                    statusText.innerText = '❌ 辨識失敗'; 
-                    resultDiv.innerHTML = `<span style="color:red;">錯誤原因：${e.message || '未知錯誤'}</span>`; 
-                }
+                } catch(e) { statusText.innerText = '❌ 辨識失敗'; resultDiv.innerHTML = `<span style="color:red;">錯誤原因：${e.message || '未知錯誤'}</span>`; }
             }
         };
 
@@ -368,16 +367,12 @@
 
             if (engine === "gemini") {
                 if (!apiKeyInput.value) return alert("請輸入 Google Gemini 金鑰！");
-                wolframResultImg.style.display = 'none'; 
-                resultDiv.style.display = 'block'; 
-                statusText.innerText = '💡 Gemini 正在分析您的問題與圖片...';
+                wolframResultImg.style.display = 'none'; resultDiv.style.display = 'block'; statusText.innerText = '💡 Gemini 正在分析您的問題與圖片...';
                 
                 let parts = [{ text: `解答以下問題：\n${q || "請解析這張圖片的電路原理或內容"}\n需要時請使用 \`\`\`mermaid 繪製架構圖。` }];
                 if (hasImg) {
-                    const f = qaPhotoFile.files[0];
-                    const mimeType = f.type || "image/jpeg";
-                    const b64 = await fileToBase64(f);
-                    parts.push({ inlineData: { mimeType: mimeType, data: b64 } });
+                    const b64 = await fileToBase64Compressed(qaPhotoFile.files[0]);
+                    parts.push({ inlineData: { mimeType: "image/jpeg", data: b64 } });
                 }
                 callGeminiAPI(parts);
             } 
@@ -385,52 +380,27 @@
                 if (!wolframKeyInput.value) return alert("請輸入 WolframAlpha AppID！");
                 
                 if (hasImg) {
-                    resultDiv.style.display = 'block'; 
-                    wolframResultImg.style.display = 'none'; 
-                    statusText.innerText = '👀 正在請 Gemini 讀取圖片中的算式...';
-                    
+                    resultDiv.style.display = 'block'; wolframResultImg.style.display = 'none'; statusText.innerText = '👀 正在請 Gemini 讀取圖片中的算式...';
                     try {
-                        const f = qaPhotoFile.files[0];
-                        const mimeType = f.type || "image/jpeg";
-                        const b64 = await fileToBase64(f);
+                        const b64 = await fileToBase64Compressed(qaPhotoFile.files[0]);
                         const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$){apiKeyInput.value.trim()}`, {
                             method: 'POST', headers: { 'Content-Type': 'application/json' }, 
-                            body: JSON.stringify({ contents: [{ parts: [{text: "Extract ONLY the math expression in plain text (e.g. x^2+5x=0). NO markdown."}, { inlineData: { mimeType: mimeType, data: b64 } }] }] })
+                            body: JSON.stringify({ contents: [{ parts: [{text: "Extract ONLY the math expression in plain text (e.g. x^2+5x=0). NO markdown."}, { inlineData: { mimeType: "image/jpeg", data: b64 } }] }] })
                         });
                         const data = await res.json();
                         if(data.error) throw new Error(data.error.message);
                         
                         const eq = data.candidates[0].content.parts[0].text.trim() + (q ? " " + q : "");
-                        statusText.innerText = `🧮 辨識成功：${eq}。正在交由 Wolfram 計算...`; 
-                        resultDiv.style.display = 'none'; 
-                        wolframResultImg.style.display = 'block'; 
+                        statusText.innerText = `🧮 辨識成功：${eq}。正在交由 Wolfram 計算...`; resultDiv.style.display = 'none'; wolframResultImg.style.display = 'block'; 
                         
                         wolframResultImg.src = `[https://api.wolframalpha.com/v1/simple?appid=$](https://api.wolframalpha.com/v1/simple?appid=$){wolframKeyInput.value.trim()}&i=${encodeURIComponent(eq)}&background=white&fontsize=16`;
-                        wolframResultImg.onload = () => { 
-                            statusText.innerText = '✅ Wolfram 計算完成！'; 
-                            currentSummaryText = `📝 算式：\n${eq}`; 
-                            actionGroup.classList.remove('hidden'); 
-                        };
-                    } catch(e) { 
-                        statusText.innerText = '❌ 辨識失敗'; 
-                        resultDiv.style.display = 'block';
-                        resultDiv.innerHTML = `<span style="color:red;">錯誤原因：${e.message || '未知錯誤'}</span>`;
-                    }
+                        wolframResultImg.onload = () => { statusText.innerText = '✅ Wolfram 計算完成！'; currentSummaryText = `📝 算式：\n${eq}`; actionGroup.classList.remove('hidden'); };
+                    } catch(e) { statusText.innerText = '❌ 辨識失敗'; resultDiv.style.display = 'block'; resultDiv.innerHTML = `<span style="color:red;">錯誤原因：${e.message || '未知錯誤'}</span>`; }
                 } else {
-                    resultDiv.style.display = 'none'; 
-                    wolframResultImg.style.display = 'block'; 
-                    statusText.innerText = '🧮 Wolfram 計算中...';
-                    
+                    resultDiv.style.display = 'none'; wolframResultImg.style.display = 'block'; statusText.innerText = '🧮 Wolfram 計算中...';
                     wolframResultImg.src = `[https://api.wolframalpha.com/v1/simple?appid=$](https://api.wolframalpha.com/v1/simple?appid=$){wolframKeyInput.value.trim()}&i=${encodeURIComponent(q)}&background=white&fontsize=16`;
-                    wolframResultImg.onload = () => { 
-                        statusText.innerText = '✅ Wolfram 計算完成！'; 
-                        currentSummaryText = `問題：\n${q}`; 
-                        actionGroup.classList.remove('hidden'); 
-                    };
-                    wolframResultImg.onerror = () => { 
-                        statusText.innerText = '❌ 計算失敗，請檢查算式'; 
-                        wolframResultImg.style.display = 'none'; 
-                    };
+                    wolframResultImg.onload = () => { statusText.innerText = '✅ Wolfram 計算完成！'; currentSummaryText = `問題：\n${q}`; actionGroup.classList.remove('hidden'); };
+                    wolframResultImg.onerror = () => { statusText.innerText = '❌ 計算失敗，請檢查算式'; wolframResultImg.style.display = 'none'; };
                 }
             }
         };
@@ -446,11 +416,7 @@
                 currentSummaryText = data.candidates[0].content.parts[0].text;
                 renderResult(currentSummaryText);
                 statusText.innerText = '✅ 處理完成！'; actionGroup.classList.remove('hidden'); recordBtn.style.display = 'block';
-            } catch (e) { 
-                statusText.innerText = '❌ 處理失敗'; 
-                resultDiv.innerHTML = `<span style="color:red;">API 錯誤原因：${e.message || '網路異常或金鑰錯誤'}</span>`;
-                recordBtn.style.display = 'block'; 
-            }
+            } catch (e) { statusText.innerText = '❌ 處理失敗'; resultDiv.innerHTML = `<span style="color:red;">API 錯誤原因：${e.message || '網路異常或金鑰錯誤'}</span>`; recordBtn.style.display = 'block'; }
         }
 
         document.getElementById('cloudBtn').onclick = async () => {
