@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>學習器 (黃金防爆版)</title>
+    <title>學習器 (完美修復版)</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
     <style>
@@ -53,7 +53,7 @@
 </head>
 <body>
 
-    <h2>⚡ 學習器 (黃金防爆版)</h2>
+    <h2>⚡ 學習器 (完美修復版)</h2>
     
     <div class="pomodoro-bar">
         🍅 專注計時：<span id="timerDisplay">25:00</span>
@@ -117,7 +117,7 @@
         <div class="input-group">
             <label>⚙️ 選擇看圖引擎：</label>
             <select id="hwEngineSelect">
-                <option value="gemini">🧠 Gemini 1.5 Flash (黃金防爆解析)</option>
+                <option value="gemini">🧠 Gemini 1.5 Flash (標準解析)</option>
                 <option value="wolfram">🧮 Wolfram (拍微積分/方程式，AI代轉 Wolfram計算)</option>
             </select>
         </div>
@@ -134,7 +134,7 @@
         <div class="input-group">
             <label>⚙️ 選擇引擎：</label>
             <select id="engineSelect">
-                <option value="gemini">🧠 Gemini 1.5 Flash (黃金防爆解析)</option>
+                <option value="gemini">🧠 Gemini 1.5 Flash (標準解析)</option>
                 <option value="wolfram">🧮 WolframAlpha (微積分、解方程式、畫圖)</option>
             </select>
         </div>
@@ -389,10 +389,8 @@
                 } else {
                     wolframResultImg.style.display = 'none'; resultDiv.style.display = 'block'; statusText.innerText = '👀 辨識數學式...'; resultDiv.innerHTML = '影像處理中...';
                     try {
-                        const targetUrl = new URL(`[https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent](https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent)`);
-                        targetUrl.searchParams.append('key', cleanKey);
-
-                        const res = await fetch(targetUrl.toString(), {
+                        const apiUrl = "[https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=](https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=)" + encodeURIComponent(cleanKey);
+                        const res = await fetch(apiUrl, {
                             method: 'POST', headers: { 'Content-Type': 'application/json' }, 
                             body: JSON.stringify({ contents: [{ parts: [
                                 { text: "Extract ONLY the math expression in plain text (e.g. x^2+5x=0). NO markdown." },
@@ -455,10 +453,8 @@
                             const fileData = await convertImageToJPEG(qaPhotoFile.files[0]);
                             statusText.innerText = '👀 正在請 Gemini 讀取圖片中的算式...';
                             
-                            const targetUrl = new URL(`[https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent](https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent)`);
-                            targetUrl.searchParams.append('key', cleanKey);
-
-                            const res = await fetch(targetUrl.toString(), {
+                            const apiUrl = "[https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=](https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=)" + encodeURIComponent(cleanKey);
+                            const res = await fetch(apiUrl, {
                                 method: 'POST', headers: { 'Content-Type': 'application/json' }, 
                                 body: JSON.stringify({ contents: [{ parts: [
                                     { text: "Extract ONLY the math expression in plain text (e.g. x^2+5x=0). NO markdown." },
@@ -487,17 +483,16 @@
             }
         };
 
-        // 🚀 使用標準 URL 物件建構請求，完全迴避 Safari 的 pattern 驗證報錯
+        // 🚀 採用最純粹乾淨的字串 URL 結合 fetch 發送請求
         async function callSafeGeminiAPI(parts) {
             resultDiv.style.display = 'block';
             try {
                 const cleanKey = apiKeyInput.value.trim();
                 if (!cleanKey) throw new Error("請先輸入 Gemini 金鑰");
 
-                const targetUrl = new URL(`[https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent](https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent)`);
-                targetUrl.searchParams.append('key', cleanKey);
+                const apiUrl = "[https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=](https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=)" + encodeURIComponent(cleanKey);
 
-                const res = await fetch(targetUrl.toString(), {
+                const res = await fetch(apiUrl, {
                     method: 'POST', 
                     headers: { 'Content-Type': 'application/json' }, 
                     body: JSON.stringify({ contents: [{ parts: parts }] })
@@ -537,10 +532,8 @@
             if (!currentSummaryText || !cleanKey) return;
             statusText.innerText = '⏳ 製作閃卡中...';
             try {
-                const targetUrl = new URL(`[https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent](https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent)`);
-                targetUrl.searchParams.append('key', cleanKey);
-
-                const res = await fetch(targetUrl.toString(), {
+                const apiUrl = "[https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=](https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=)" + encodeURIComponent(cleanKey);
+                const res = await fetch(apiUrl, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' }, 
                     body: JSON.stringify({ contents: [{ parts: [{ text: `嚴格以 CSV 格式輸出5題問答 (問題,答案)。內容：\n${currentSummaryText}` }] }] })
                 });
