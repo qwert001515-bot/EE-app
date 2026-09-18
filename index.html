@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>學習器</title>
+    <title>學習器 (Pro 穩定版)</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
     <style>
@@ -217,7 +217,7 @@
             if(!e.target.files.length) return;
             document.getElementById('status').innerText = '⏳ 正在存入平板書庫...';
             const f = e.target.files[0];
-            const fileData = await processFileSafe(f);
+            const fileData = await processFileSimple(f);
             await saveFileDB({ id: Date.now().toString(), name: f.name, mimeType: fileData.mimeType, data: fileData.data });
             await refreshLibrary();
             document.getElementById('status').innerText = '✅ 講義永久儲存成功！';
@@ -253,36 +253,23 @@
         let mediaRecorder, audioChunks = [], currentAudioBlob = null, currentSummaryText = "", currentMode = "學習筆記";
         const statusText = document.getElementById('status'), resultDiv = document.getElementById('result'), wolframResultImg = document.getElementById('wolframResult'), actionGroup = document.getElementById('actionGroup'), audioPlayback = document.getElementById('audioPlayback');
         
-        // 🚀 終極二進位讀取法：放棄 Safari 的 DataURL 轉換，直接讀取 ArrayBuffer 並手動編碼 Base64
-        function arrayBufferToBase64(buffer) {
-            let binary = '';
-            const bytes = new Uint8Array(buffer);
-            const len = bytes.byteLength;
-            for (let i = 0; i < len; i++) {
-                binary += String.fromCharCode(bytes[i]);
-            }
-            return window.btoa(binary);
-        }
-
-        function processFileSafe(file) {
+        // 🚀 最簡潔、最標準、無加工的檔案讀取方式
+        function processFileSimple(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.onload = (e) => {
-                    try {
-                        const buffer = e.target.result;
-                        const base64 = arrayBufferToBase64(buffer);
-                        
-                        // 統一將所有圖片指定為 image/jpeg，因為 Gemini 對這 MIME type 支援度最高
-                        const mimeType = file.type.startsWith('image/') ? 'image/jpeg' : (file.type || 'text/plain');
-                        
-                        resolve({ mimeType: mimeType, data: base64 });
-                    } catch (err) {
-                        reject(err);
+                    // e.target.result 的格式為 "data:image/jpeg;base64,/9j/4AAQ..."
+                    // 我們只要逗號後面的純 Base64 字串
+                    const base64String = e.target.result.split(',')[1];
+                    // 為了避免 iPad HEIC 格式不相容問題，MIME 統一設定為 Google 支援的 image/jpeg
+                    let mimeType = file.type;
+                    if (!mimeType || mimeType === "" || mimeType.includes("heic")) {
+                        mimeType = "image/jpeg";
                     }
+                    resolve({ mimeType: mimeType, data: base64String });
                 };
-                reader.onerror = reject;
-                // 這裡改用 readAsArrayBuffer，完全避開 readAsDataURL 的坑！
-                reader.readAsArrayBuffer(file);
+                reader.onerror = () => reject(new Error("無法讀取檔案"));
+                reader.readAsDataURL(file);
             });
         }
         
@@ -317,7 +304,7 @@
                 const fData = await getFileByIdDB(activeFileSelect.value);
                 if(fData) parts.push({ inlineData: { mimeType: fData.mimeType, data: fData.data } });
             }
-            const audioData = await processFileSafe(currentAudioBlob);
+            const audioData = await processFileSimple(currentAudioBlob);
             parts.push({ inlineData: { mimeType: "audio/webm", data: audioData.data } });
             let pText = `整理「${document.getElementById('courseType').value}」課程的錄音筆記。若遇邏輯流程請用 \`\`\`mermaid 繪圖。`;
             if (document.getElementById('recordModeSelect').value === 'book') pText += "請比對講義並標示頁碼。";
@@ -336,7 +323,7 @@
             currentMode = "拍照解題"; currentAudioBlob = null; audioPlayback.style.display = 'none'; actionGroup.classList.add('hidden');
             
             try {
-                const fileData = await processFileSafe(photoFile.files[0]);
+                const fileData = await processFileSimple(photoFile.files[0]);
 
                 if (hwEngine === 'gemini') {
                     wolframResultImg.style.display = 'none'; resultDiv.style.display = 'block'; statusText.innerText = '🧠 Gemini Pro 解析中...';
@@ -381,7 +368,7 @@
                     
                     let parts = [{ text: `解答以下問題：\n${q || "請解析這張圖片的電路原理或內容"}\n需要時請使用 \`\`\`mermaid 繪製架構圖。` }];
                     if (hasImg) {
-                        const fileData = await processFileSafe(qaPhotoFile.files[0]);
+                        const fileData = await processFileSimple(qaPhotoFile.files[0]);
                         parts.push({ inlineData: fileData });
                     }
                     callGeminiAPI(parts);
@@ -392,7 +379,7 @@
                     if (hasImg) {
                         resultDiv.style.display = 'block'; wolframResultImg.style.display = 'none'; statusText.innerText = '👀 正在請 Gemini 讀取圖片中的算式...';
                         try {
-                            const fileData = await processFileSafe(qaPhotoFile.files[0]);
+                            const fileData = await processFileSimple(qaPhotoFile.files[0]);
                             const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=$){apiKeyInput.value.trim()}`, {
                                 method: 'POST', headers: { 'Content-Type': 'application/json' }, 
                                 body: JSON.stringify({ contents: [{ parts: [{text: "Extract ONLY the math expression in plain text (e.g. x^2+5x=0). NO markdown."}, { inlineData: fileData }] }] })
