@@ -257,55 +257,51 @@
         let mediaRecorder, audioChunks = [], currentAudioBlob = null, currentSummaryText = "", currentMode = "學習筆記";
         const statusText = document.getElementById('status'), resultDiv = document.getElementById('result'), wolframResultImg = document.getElementById('wolframResult'), actionGroup = document.getElementById('actionGroup'), audioPlayback = document.getElementById('audioPlayback');
         
-        // 🚀 鐵血防線：強制轉存安全尺寸 JPEG，上傳前檢查字串長度
+        // 🚀 關鍵修復：解決 iOS Safari 遺失 MIME Type 的問題！
+        // 如果 iOS 把標籤弄丟（給出空字串），我們強制幫它打上 "image/jpeg"
         function getSafeImageData(file) {
             return new Promise((resolve, reject) => {
                 if (!file) return reject("沒有選擇檔案");
                 
+                // 這是之前造成 Gemini 大崩潰的原因：如果 file.type 是空的，API 會直接報錯
+                let safeMime = file.type;
+                if (!safeMime || safeMime.trim() === "") {
+                    safeMime = "image/jpeg"; // 強制貼上安全標籤
+                }
+
                 const reader = new FileReader();
                 reader.onload = (e) => {
-                    // 如果不是圖片，直接回傳
-                    if (!file.type.startsWith('image/')) {
-                        const b64 = e.target.result.split(',')[1];
-                        if (!b64 || b64.length < 10) return reject("檔案資料過短");
-                        resolve({ mimeType: file.type, data: b64 });
-                        return;
-                    }
-
                     const img = new Image();
                     img.onload = () => {
                         try {
                             const canvas = document.createElement('canvas');
                             let w = img.width, h = img.height;
-                            // 鐵血降級：最大邊長縮至 800，確保 iPad 絕對不會 OOM (Out Of Memory)
-                            const max = 800; 
+                            const max = 1200; 
                             if (w > h && w > max) { h *= max / w; w = max; }
                             else if (h > max) { w *= max / h; h = max; }
+                            canvas.width = w; canvas.height = h;
                             
-                            canvas.width = w; 
-                            canvas.height = h;
                             const ctx = canvas.getContext('2d');
                             ctx.drawImage(img, 0, 0, w, h);
                             
-                            // 強制轉出 70% 畫質的 JPEG
-                            const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-                            const b64 = dataUrl.split(',')[1];
-                            
-                            // 鐵血攔截：如果轉出的字串太短，代表轉換失敗，立即拋出錯誤
-                            if (!b64 || b64.length < 100) {
-                                reject("Safari 圖片轉換失敗，請重新拍攝或選取。");
-                                return;
-                            }
-                            
+                            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                            let b64 = dataUrl.split(',')[1];
+                            b64 = b64.replace(/[^a-zA-Z0-9+/=]/g, ''); // 徹底移除不合法字元
                             resolve({ mimeType: "image/jpeg", data: b64 });
                         } catch (err) {
-                            reject("圖片處理發生錯誤：" + err.message);
+                            let b64 = e.target.result.split(',')[1];
+                            if (b64) b64 = b64.replace(/[^a-zA-Z0-9+/=]/g, '');
+                            resolve({ mimeType: safeMime, data: b64 });
                         }
                     };
-                    img.onerror = () => reject("無法載入圖片進行處理。");
+                    img.onerror = () => {
+                        let b64 = e.target.result.split(',')[1];
+                        if (b64) b64 = b64.replace(/[^a-zA-Z0-9+/=]/g, '');
+                        resolve({ mimeType: safeMime, data: b64 });
+                    };
                     img.src = e.target.result;
                 };
-                reader.onerror = () => reject("FileReader 無法讀取此檔案。");
+                reader.onerror = () => reject("檔案讀取失敗");
                 reader.readAsDataURL(file);
             });
         }
@@ -343,13 +339,14 @@
             }
             try {
                 const audioData = await getSafeImageData(currentAudioBlob);
-                parts.push({ inlineData: audioData });
+                // 錄音檔必須保持 audio/webm
+                parts.push({ inlineData: { mimeType: "audio/webm", data: audioData.data } });
                 let pText = `整理「${document.getElementById('courseType').value}」課程的錄音筆記。若遇邏輯流程請用 \`\`\`mermaid 繪圖。`;
                 if (document.getElementById('recordModeSelect').value === 'book') pText += "請比對講義並標示頁碼。";
                 parts.unshift({ text: pText });
                 callGeminiAPI(parts);
             } catch (error) {
-                statusText.innerText = '❌ 錄音資料處理失敗'; resultDiv.style.display = 'block'; resultDiv.innerHTML = `<span style="color:red;">${error}</span>`;
+                statusText.innerText = '❌ 處理失敗'; resultDiv.style.display = 'block'; resultDiv.innerHTML = `<span style="color:red;">${error}</span>`;
             }
         }
 
@@ -387,7 +384,7 @@
                     } catch(e) { statusText.innerText = '❌ 辨識失敗'; resultDiv.innerHTML = `<span style="color:red;">錯誤原因：${e.message || '未知錯誤'}</span>`; }
                 }
             } catch (error) {
-                statusText.innerText = '❌ 圖片讀取失敗'; resultDiv.style.display = 'block'; resultDiv.innerHTML = `<span style="color:red; font-weight:bold;">🚨 錯誤：${error}</span><br>這張照片的格式無法被 iPad 正確讀取，請嘗試重新截圖或拍攝。`;
+                statusText.innerText = '❌ 圖片處理失敗'; resultDiv.style.display = 'block'; resultDiv.innerHTML = `<span style="color:red;">${error}</span>`;
             }
         };
 
@@ -444,7 +441,7 @@
                     }
                 }
             } catch (error) {
-                statusText.innerText = '❌ 處理失敗'; resultDiv.style.display = 'block'; resultDiv.innerHTML = `<span style="color:red; font-weight:bold;">🚨 錯誤：${error}</span><br>這張照片的格式無法被 iPad 正確讀取，請嘗試使用截圖功能重新擷取畫面再上傳。`;
+                statusText.innerText = '❌ 處理失敗'; resultDiv.style.display = 'block'; resultDiv.innerHTML = `<span style="color:red;">${error}</span>`;
             }
         };
 
