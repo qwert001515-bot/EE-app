@@ -3,334 +3,142 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>電機系 2B 智慧圖文學習資料庫</title>
+    <title>電機系 2B 全能學習神器</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; line-height: 1.6; background-color: #f4f6f9; color: #333; }
-        h2 { text-align: center; color: #2c3e50; font-weight: bold; margin-bottom: 10px; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; max-width: 600px; margin: auto; line-height: 1.6; background-color: #f4f6f9; color: #333; }
+        h2 { text-align: center; color: #2c3e50; font-weight: bold; margin-bottom: 20px; }
+        
+        /* 頁籤切換器設計 */
+        .tab-container { display: flex; background: #e9ecef; border-radius: 10px; padding: 4px; margin-bottom: 20px; gap: 4px; }
+        .tab-btn { flex: 1; text-align: center; padding: 10px 5px; font-size: 14px; font-weight: bold; color: #6c757d; border: none; background: transparent; border-radius: 8px; cursor: pointer; transition: 0.3s; }
+        .tab-btn.active { background: white; color: #007bff; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+
         .container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px; }
-        .selector-group { display: flex; flex-direction: column; gap: 10px; background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #e9ecef; }
-        .selector-group label { font-weight: bold; color: #495057; font-size: 14px; }
-        input[type="password"], select { padding: 12px; font-size: 16px; border: 1px solid #ced4da; border-radius: 8px; width: 100%; box-sizing: border-box; }
+        .input-group label { font-weight: bold; color: #495057; font-size: 14px; display: block; margin-bottom: 5px; }
+        input[type="password"], select, input[type="file"] { padding: 12px; font-size: 16px; border: 1px solid #ced4da; border-radius: 8px; width: 100%; box-sizing: border-box; }
+        textarea { padding: 12px; font-size: 16px; border: 1px solid #ced4da; border-radius: 8px; width: 100%; box-sizing: border-box; resize: vertical; font-family: inherit; }
         
-        /* 檔案庫區塊樣式 */
-        .library-container { background: #e9ecef; padding: 15px; border-radius: 8px; display: flex; flex-direction: column; gap: 10px; }
-        .file-list { max-height: 150px; overflow-y: auto; background: white; border-radius: 6px; border: 1px solid #ced4da; }
-        .file-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid #eee; font-size: 14px; }
-        .file-item:last-child { border-bottom: none; }
-        .btn-small { padding: 6px 12px; font-size: 13px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
-        .btn-upload { background-color: #28a745; color: white; width: 100%; padding: 10px;}
-        .btn-delete-file { background-color: #dc3545; color: white; }
-        .active-file-selector { background: #e3f2fd; border: 1px solid #b6d4fe; }
+        /* 按鈕樣式 */
+        button { padding: 15px; font-size: 16px; border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; width: 100%; transition: 0.3s; }
+        .btn-blue { background-color: #007bff; }
+        .btn-red { background-color: #dc3545; display: none; }
+        .btn-purple { background-color: #6f42c1; }
+        .btn-teal { background-color: #17a2b8; }
+        .btn-green { background-color: #28a745; display: none; margin-top: 10px; }
         
-        .btn-group { display: flex; gap: 10px; }
-        button { padding: 15px; font-size: 16px; border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; width: 100%; transition: 0.3s; display: flex; justify-content: center; align-items: center; gap: 5px; }
-        #recordBtn { background-color: #007bff; }
-        #stopBtn { background-color: #dc3545; display: none; }
-        #analyzeBtn { background-color: #6f42c1; }
-        #status { text-align: center; font-size: 14px; color: #6c757d; font-weight: bold; }
+        #status { text-align: center; font-size: 15px; color: #6c757d; font-weight: bold; margin-top: 10px; }
         #audioPlayback { width: 100%; display: none; margin-top: 10px; border-radius: 8px; }
+        #imagePreview { max-width: 100%; border-radius: 8px; display: none; margin-top: 10px; border: 1px solid #dee2e6; }
         
-        .result-box, .history-box { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .result-box { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         h3 { color: #2c3e50; margin-top: 0; border-bottom: 2px solid #e9ecef; padding-bottom: 5px; }
-        #result { background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #e9ecef; min-height: 100px; font-size: 15px; overflow-x: auto; }
+        #result { background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #e9ecef; min-height: 150px; font-size: 16px; overflow-x: auto; }
         
-        .history-item { background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #e9ecef; margin-bottom: 10px; position: relative; }
-        .history-time { font-size: 12px; color: #888; margin-bottom: 5px; font-weight: bold; }
-        .delete-btn { position: absolute; top: 10px; right: 10px; background: #ff4d4f; color: white; border: none; padding: 5px 10px; font-size: 12px; border-radius: 4px; cursor: pointer; width: auto; }
-        .mermaid { text-align: center; margin: 15px 0; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
-    <h2>⚡ 電機系 2B 學習資料庫</h2>
+    <h2>⚡ 電機系全能學習神器</h2>
     
-    <div class="container">
+    <!-- 全域設定 -->
+    <div class="container" style="padding-bottom: 10px;">
         <input type="password" id="apiKey" placeholder="請貼上您的 Google AI 授權金鑰" />
-        
-        <!-- 本地檔案庫管理區塊 -->
-        <div class="library-container">
-            <label>📚 我的平板講義庫 (永久儲存)：</label>
-            <div class="file-list" id="fileListUI">
-                <!-- 檔案列表會透過 JS 動態生成 -->
-            </div>
-            <input type="file" id="fileUpload" accept=".pdf,.txt" style="display:none;" />
-            <button id="triggerUploadBtn" class="btn-small btn-upload">📥 上傳新講義到庫中</button>
+        <div class="input-group" style="margin-top: 10px;">
+            <label>📍 當前科目：</label>
+            <select id="courseType">
+                <option value="理論必修">📘 理論必修 (工數/電路學/電子學/邏設)</option>
+                <option value="實驗操作">🔌 實驗操作 (基礎電學實驗)</option>
+                <option value="語文訓練">🗣️ 語文訓練 (英文閱讀與聽講)</option>
+                <option value="通識與倫理">🌱 通識與倫理 (園藝/工程倫理)</option>
+            </select>
         </div>
-
-        <div class="selector-group">
-            <div>
-                <label>📍 當前科目筆記分區：</label>
-                <select id="courseType" onchange="loadHistory()">
-                    <option value="ee_core">📘 理論必修 (工數/電路學/電子學/邏設)</option>
-                    <option value="ee_lab">🔌 實驗操作 (基礎電學實驗)</option>
-                    <option value="english">🗣️ 語文訓練 (英文閱讀與聽講)</option>
-                    <option value="general">🌱 通識與倫理 (園藝/工程倫理)</option>
-                </select>
-            </div>
-            
-            <div class="active-file-selector">
-                <label>🔍 選擇本次分析要搭配的講義：</label>
-                <select id="activeFileSelect">
-                    <option value="none">❌ 不使用講義 (僅分析錄音)</option>
-                    <!-- 其他選項會從檔案庫自動匯入 -->
-                </select>
-            </div>
-
-            <div>
-                <label>🎯 AI 處理模式：</label>
-                <select id="modeType">
-                    <option value="notes">📝 圖文筆記總結 (若有講義則對應頁碼)</option>
-                    <option value="quiz">🎯 小考重點與模擬題 (若有講義則對應頁碼)</option>
-                    <option value="homework">✍️ 作業與解題提示 (若有講義則對應頁碼)</option>
-                </select>
-            </div>
-        </div>
-
-        <div class="btn-group">
-            <button id="recordBtn">🔴 開始錄音聽課</button>
-            <button id="stopBtn">⏹️ 停止錄音並分析</button>
-            <button id="analyzeBtn">📤 僅分析選定的講義</button>
-        </div>
-        
-        <div id="status">準備就緒</div>
-        <audio id="audioPlayback" controls></audio>
     </div>
 
+    <!-- 頁籤切換 (新增問答區) -->
+    <div class="tab-container">
+        <button class="tab-btn active" id="tabBook" onclick="switchTab('book')">📖 聽課錄音</button>
+        <button class="tab-btn" id="tabHomework" onclick="switchTab('homework')">📸 拍照解題</button>
+        <button class="tab-btn" id="tabQA" onclick="switchTab('qa')">💬 隨問隨答</button>
+    </div>
+
+    <!-- 區域 1：聽課與書本區 -->
+    <div class="container" id="sectionBook">
+        <div class="input-group">
+            <label>📄 (選填) 上傳參考講義 (PDF/TXT)：</label>
+            <input type="file" id="bookFile" accept=".pdf,.txt" />
+        </div>
+        <button class="btn-blue" id="recordBtn">🔴 開始錄音聽課</button>
+        <button class="btn-red" id="stopBtn">⏹️ 停止錄音並總結</button>
+    </div>
+
+    <!-- 區域 2：作業與拍照區 -->
+    <div class="container hidden" id="sectionHomework">
+        <div class="input-group">
+            <label>📸 拍攝黑板或作業紙本：</label>
+            <input type="file" id="photoFile" accept="image/*" capture="environment" />
+            <img id="imagePreview" alt="預覽圖片" />
+        </div>
+        <button class="btn-purple" id="analyzePhotoBtn">🧠 讓 AI 幫我解題</button>
+    </div>
+
+    <!-- 區域 3：文字隨問隨答區 (全新加入) -->
+    <div class="container hidden" id="sectionQA">
+        <div class="input-group">
+            <label>💬 輸入你的問題：</label>
+            <textarea id="questionText" rows="4" placeholder="例如：請用最簡單的話解釋戴維寧定理，並舉一個例子。"></textarea>
+        </div>
+        <button class="btn-teal" id="askBtn">💡 送出問題</button>
+    </div>
+
+    <!-- 共用狀態與雲端按鈕 -->
+    <div class="container" style="background: transparent; box-shadow: none; padding: 0;">
+        <div id="status">請選擇上方功能開始學習</div>
+        <audio id="audioPlayback" controls></audio>
+        <button class="btn-green" id="cloudBtn">☁️ 一鍵打包存至雲端 (iCloud / Drive)</button>
+    </div>
+
+    <!-- 結果顯示區 -->
     <div class="result-box">
-        <h3>✨ 最新產出結果</h3>
+        <h3>📝 AI 產出結果</h3>
         <div id="result"><span style="color:#6c757d;">產出內容會顯示在這裡...</span></div>
     </div>
 
-    <div class="history-box">
-        <h3 id="historyTitle">🗂️ 歷史筆記庫</h3>
-        <div id="historyContainer"></div>
-    </div>
-
     <script>
-        mermaid.initialize({ startOnLoad: false, theme: 'default' });
-
-        // --- 全域資料庫設置 (EE_Study_DB_Multi) ---
-        const dbName = "EE_Study_DB_Multi";
-        const storeName = "all_files";
-
-        function initDB() {
-            return new Promise((resolve, reject) => {
-                const request = indexedDB.open(dbName, 1);
-                request.onupgradeneeded = (e) => {
-                    const db = e.target.result;
-                    if (!db.objectStoreNames.contains(storeName)) {
-                        db.createObjectStore(storeName, { keyPath: "id" });
-                    }
-                };
-                request.onsuccess = (e) => resolve(e.target.result);
-                request.onerror = (e) => reject(e.target.error);
-            });
+        // --- UI 切換邏輯 ---
+        function switchTab(mode) {
+            ['tabBook', 'tabHomework', 'tabQA'].forEach(id => document.getElementById(id).classList.remove('active'));
+            ['sectionBook', 'sectionHomework', 'sectionQA'].forEach(id => document.getElementById(id).classList.add('hidden'));
+            
+            if (mode === 'book') {
+                document.getElementById('tabBook').classList.add('active');
+                document.getElementById('sectionBook').classList.remove('hidden');
+                document.getElementById('status').innerText = '準備就緒，可上傳講義或直接錄音。';
+            } else if (mode === 'homework') {
+                document.getElementById('tabHomework').classList.add('active');
+                document.getElementById('sectionHomework').classList.remove('hidden');
+                document.getElementById('status').innerText = '請點擊上方按鈕開啟相機拍照。';
+            } else if (mode === 'qa') {
+                document.getElementById('tabQA').classList.add('active');
+                document.getElementById('sectionQA').classList.remove('hidden');
+                document.getElementById('status').innerText = '遇到不懂的觀念？直接打字問 AI 吧！';
+            }
         }
 
-        async function saveFileToDB(fileData) {
-            const db = await initDB();
-            return new Promise((resolve, reject) => {
-                const tx = db.transaction(storeName, "readwrite");
-                const store = tx.objectStore(storeName);
-                store.put(fileData);
-                tx.oncomplete = () => resolve();
-                tx.onerror = () => reject(tx.error);
-            });
-        }
-
-        async function getAllFilesFromDB() {
-            const db = await initDB();
-            return new Promise((resolve, reject) => {
-                const tx = db.transaction(storeName, "readonly");
-                const store = tx.objectStore(storeName);
-                const request = store.getAll();
-                request.onsuccess = () => resolve(request.result);
-                request.onerror = () => reject(request.error);
-            });
-        }
-
-        async function getFileById(id) {
-            const db = await initDB();
-            return new Promise((resolve, reject) => {
-                const tx = db.transaction(storeName, "readonly");
-                const store = tx.objectStore(storeName);
-                const request = store.get(id);
-                request.onsuccess = () => resolve(request.result);
-                request.onerror = () => reject(request.error);
-            });
-        }
-
-        async function deleteFileFromDB(id) {
-            const db = await initDB();
-            return new Promise((resolve, reject) => {
-                const tx = db.transaction(storeName, "readwrite");
-                const store = tx.objectStore(storeName);
-                const request = store.delete(id);
-                request.onsuccess = () => resolve();
-                request.onerror = () => reject(request.error);
-            });
-        }
-
-        // --- UI 與錄音變數 ---
+        // --- 共用變數 ---
         let mediaRecorder;
         let audioChunks = [];
+        let currentAudioBlob = null;
+        let currentSummaryText = "";
+        let currentMode = "book"; 
         
-        const recordBtn = document.getElementById('recordBtn');
-        const stopBtn = document.getElementById('stopBtn');
-        const analyzeBtn = document.getElementById('analyzeBtn');
-        const statusText = document.getElementById('status');
-        const resultDiv = document.getElementById('result');
         const apiKeyInput = document.getElementById('apiKey');
         const courseTypeSelect = document.getElementById('courseType');
-        const modeTypeSelect = document.getElementById('modeType');
-        
-        // 檔案庫管理相關元素
-        const fileInput = document.getElementById('fileUpload');
-        const triggerUploadBtn = document.getElementById('triggerUploadBtn');
-        const fileListUI = document.getElementById('fileListUI');
-        const activeFileSelect = document.getElementById('activeFileSelect');
-
-        window.onload = () => {
-            loadHistory();
-            refreshFileList();
-        };
-
-        // --- 刷新檔案庫介面 ---
-        async function refreshFileList() {
-            const files = await getAllFilesFromDB();
-            
-            // 1. 更新清單列表 UI
-            fileListUI.innerHTML = '';
-            if (files.length === 0) {
-                fileListUI.innerHTML = '<div style="padding: 10px; text-align: center; color: #888;">講義庫目前是空的</div>';
-            } else {
-                files.forEach(file => {
-                    const itemDiv = document.createElement('div');
-                    itemDiv.className = 'file-item';
-                    
-                    const nameSpan = document.createElement('span');
-                    nameSpan.innerText = `📄 ${file.name}`;
-                    
-                    const delBtn = document.createElement('button');
-                    delBtn.className = 'btn-small btn-delete-file';
-                    delBtn.innerText = '刪除';
-                    delBtn.onclick = async () => {
-                        if(confirm(`確定要從庫中刪除 ${file.name} 嗎？`)) {
-                            await deleteFileFromDB(file.id);
-                            refreshFileList();
-                        }
-                    };
-                    
-                    itemDiv.appendChild(nameSpan);
-                    itemDiv.appendChild(delBtn);
-                    fileListUI.appendChild(itemDiv);
-                });
-            }
-
-            // 2. 更新下拉選單
-            const currentSelected = activeFileSelect.value;
-            activeFileSelect.innerHTML = '<option value="none">❌ 不使用講義 (僅分析錄音)</option>';
-            files.forEach(file => {
-                const option = document.createElement('option');
-                option.value = file.id;
-                option.innerText = `📖 ${file.name}`;
-                activeFileSelect.appendChild(option);
-            });
-            
-            // 嘗試保留原本的選擇
-            if (Array.from(activeFileSelect.options).some(opt => opt.value === currentSelected)) {
-                activeFileSelect.value = currentSelected;
-            }
-        }
-
-        // --- 處理檔案上傳至庫 ---
-        triggerUploadBtn.addEventListener('click', () => fileInput.click());
-
-        fileInput.addEventListener('change', async (e) => {
-            if (!e.target.files.length) return;
-            const file = e.target.files[0];
-            
-            statusText.innerText = '⏳ 正在將講義存入平板庫中...';
-
-            try {
-                const base64Data = await fileToBase64(file);
-                const mimeType = file.type === "application/pdf" ? "application/pdf" : "text/plain";
-                
-                const fileData = {
-                    id: Date.now().toString(),
-                    name: file.name,
-                    mimeType: mimeType,
-                    data: base64Data
-                };
-                
-                await saveFileToDB(fileData);
-                await refreshFileList();
-                
-                // 自動將下拉選單切換到剛上傳的檔案
-                activeFileSelect.value = fileData.id;
-                
-                statusText.innerText = `✅ 成功上傳 ${file.name}！`;
-                fileInput.value = ''; // 清空 input
-            } catch (err) {
-                alert('儲存檔案失敗，可能是檔案過大！');
-                statusText.innerText = '❌ 儲存失敗';
-            }
-        });
-
-        // --- 錄音與分析流程 ---
-        recordBtn.addEventListener('click', async () => {
-            if (!checkApiKey()) return;
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                audioChunks = [];
-                mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
-                mediaRecorder.onstop = () => processMedia('audio');
-                mediaRecorder.start();
-                
-                recordBtn.style.display = 'none';
-                analyzeBtn.style.display = 'none';
-                stopBtn.style.display = 'flex';
-                statusText.innerText = '🎙️ 正在錄音中...';
-                statusText.style.color = '#dc3545';
-            } catch (err) {
-                alert('無法啟用麥克風權限！');
-            }
-        });
-
-        stopBtn.addEventListener('click', () => {
-            mediaRecorder.stop();
-            mediaRecorder.stream.getTracks().forEach(track => track.stop());
-            resetButtons();
-            statusText.innerText = '⏳ 正在處理中...';
-        });
-
-        analyzeBtn.addEventListener('click', async () => {
-            if (!checkApiKey()) return;
-            if (activeFileSelect.value === "none") {
-                alert("請先在上方『選擇本次分析要搭配的講義』中挑選一份講義！");
-                return;
-            }
-            statusText.innerText = '⏳ 正在閱讀您的講義並生成內容...';
-            statusText.style.color = '#007bff';
-            processMedia('file_only');
-        });
-
-        function checkApiKey() {
-            if (!apiKeyInput.value) {
-                alert("請先輸入 Google AI 授權金鑰！");
-                return false;
-            }
-            return true;
-        }
-
-        function resetButtons() {
-            recordBtn.style.display = 'flex';
-            analyzeBtn.style.display = 'flex';
-            stopBtn.style.display = 'none';
-        }
+        const statusText = document.getElementById('status');
+        const resultDiv = document.getElementById('result');
+        const cloudBtn = document.getElementById('cloudBtn');
+        const audioPlayback = document.getElementById('audioPlayback');
 
         function fileToBase64(file) {
             return new Promise((resolve, reject) => {
@@ -341,44 +149,131 @@
             });
         }
 
-        async function processMedia(type) {
-            resultDiv.innerHTML = '<span style="color:#6c757d;">AI 正在分析您的資料，請稍候...</span>';
-            const apiKey = apiKeyInput.value.trim();
-            const courseType = courseTypeSelect.value;
-            const modeType = modeTypeSelect.value;
-            const selectedFileId = activeFileSelect.value;
-            
+        // ==========================================
+        // 模式 1：聽課與書本區 (錄音)
+        // ==========================================
+        const recordBtn = document.getElementById('recordBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const bookFile = document.getElementById('bookFile');
+
+        recordBtn.addEventListener('click', async () => {
+            if (!apiKeyInput.value) return alert("請先輸入金鑰！");
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+                mediaRecorder.onstop = processBookMode;
+                mediaRecorder.start();
+                
+                recordBtn.style.display = 'none';
+                cloudBtn.style.display = 'none';
+                stopBtn.style.display = 'block';
+                statusText.innerText = '🎙️ 正在錄音中...';
+                statusText.style.color = '#dc3545';
+                resultDiv.innerHTML = '<span style="color:#6c757d;">處理中...</span>';
+            } catch (err) { alert('無法啟用麥克風！'); }
+        });
+
+        stopBtn.addEventListener('click', () => {
+            mediaRecorder.stop();
+            mediaRecorder.stream.getTracks().forEach(track => track.stop());
+            stopBtn.style.display = 'none';
+            statusText.innerText = '⏳ 正在交叉比對資料，請稍候...';
+            statusText.style.color = '#007bff';
+        });
+
+        async function processBookMode() {
+            currentMode = "書本筆記";
+            currentAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            audioPlayback.src = URL.createObjectURL(currentAudioBlob);
+            audioPlayback.style.display = 'block';
+
             let contentsParts = [];
-
-            // 1. 抓取被選定的電子書
-            let selectedEbook = null;
-            if (selectedFileId !== "none") {
-                selectedEbook = await getFileById(selectedFileId);
-                if (selectedEbook) {
-                    contentsParts.push({ inlineData: { mimeType: selectedEbook.mimeType, data: selectedEbook.data } });
-                }
+            if (bookFile.files.length > 0) {
+                const file = bookFile.files[0];
+                const fileB64 = await fileToBase64(file);
+                const mime = file.type === "application/pdf" ? "application/pdf" : "text/plain";
+                contentsParts.push({ inlineData: { mimeType: mime, data: fileB64 } });
             }
 
-            // 2. 如果是錄音模式，加入錄音檔
-            if (type === 'audio') {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                document.getElementById('audioPlayback').src = URL.createObjectURL(audioBlob);
-                document.getElementById('audioPlayback').style.display = 'block';
-                const audioBase64 = await fileToBase64(audioBlob);
-                contentsParts.push({ inlineData: { mimeType: "audio/webm", data: audioBase64 } });
+            const audioB64 = await fileToBase64(currentAudioBlob);
+            contentsParts.push({ inlineData: { mimeType: "audio/webm", data: audioB64 } });
+
+            const courseName = courseTypeSelect.value;
+            let prompt = `這是一堂電機系「${courseName}」的課堂錄音。請幫我整理核心觀念與公式。`;
+            if (bookFile.files.length > 0) prompt += "並比對上傳的講義，標示出對應章節或頁碼。";
+            contentsParts.unshift({ text: prompt + " 請用繁體中文 Markdown 輸出。" });
+
+            callGeminiAPI(contentsParts);
+        }
+
+        // ==========================================
+        // 模式 2：作業與拍照區 (圖片解題)
+        // ==========================================
+        const photoFile = document.getElementById('photoFile');
+        const analyzePhotoBtn = document.getElementById('analyzePhotoBtn');
+        const imagePreview = document.getElementById('imagePreview');
+
+        photoFile.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                imagePreview.src = URL.createObjectURL(e.target.files[0]);
+                imagePreview.style.display = 'block';
             }
+        });
 
-            // 3. 組合提示詞
-            let context = `這份資料屬於「${courseTypeSelect.options[courseTypeSelect.selectedIndex].text}」。`;
-            let taskPrompt = modeType === "notes" ? "請整理完整筆記。若有需要請用 ```mermaid 畫出流程圖或心智圖。" :
-                             modeType === "quiz" ? "請整理小考重點並出 3 題模擬測驗題。" :
-                             "請提取作業題目並提供解題思路（勿直接給答案）。若需架構圖請用 ```mermaid 語法。";
+        analyzePhotoBtn.addEventListener('click', async () => {
+            if (!apiKeyInput.value) return alert("請先輸入金鑰！");
+            if (photoFile.files.length === 0) return alert("請先拍照或上傳圖片！");
             
-            let pagePrompt = selectedEbook ? `\n\n【特別要求】：請務必在輸出的最後，獨立建立一個「📖 對應講義頁面」區塊。請精準標示出重點對應在《${selectedEbook.name}》這份檔案中的「章節名稱」與「具體頁碼範圍」。` : "";
+            currentMode = "作業解題";
+            currentAudioBlob = null;
+            audioPlayback.style.display = 'none';
+            cloudBtn.style.display = 'none';
             
-            const promptText = context + taskPrompt + pagePrompt + " 請用繁體中文 Markdown 輸出。";
-            contentsParts.unshift({ text: promptText }); 
+            statusText.innerText = '🧠 AI 正在解析圖片與題目...';
+            statusText.style.color = '#6f42c1';
+            resultDiv.innerHTML = '<span style="color:#6c757d;">處理中...</span>';
 
+            const file = photoFile.files[0];
+            const imageB64 = await fileToBase64(file);
+            const mimeType = file.type || "image/jpeg";
+            const courseName = courseTypeSelect.value;
+            const prompt = `這是一張電機系「${courseName}」的作業照片。請解析題目內容，並提供「詳細解題思路與步驟提示」。不要只給最終答案。請用繁體中文 Markdown 輸出。`;
+
+            callGeminiAPI([{ text: prompt }, { inlineData: { mimeType: mimeType, data: imageB64 } }]);
+        });
+
+        // ==========================================
+        // 模式 3：文字隨問隨答區 (打字發問)
+        // ==========================================
+        const questionText = document.getElementById('questionText');
+        const askBtn = document.getElementById('askBtn');
+
+        askBtn.addEventListener('click', async () => {
+            if (!apiKeyInput.value) return alert("請先輸入金鑰！");
+            if (!questionText.value.trim()) return alert("請輸入你想問的問題！");
+
+            currentMode = "隨問隨答";
+            currentAudioBlob = null;
+            audioPlayback.style.display = 'none';
+            cloudBtn.style.display = 'none';
+
+            statusText.innerText = '💡 AI 思考中...';
+            statusText.style.color = '#17a2b8';
+            resultDiv.innerHTML = '<span style="color:#6c757d;">處理中...</span>';
+
+            const courseName = courseTypeSelect.value;
+            const prompt = `你是電機系的專業助教。這堂課是「${courseName}」。學生問了以下問題：\n\n${questionText.value}\n\n請用繁體中文詳細且具邏輯地解答，請善用 Markdown 語法讓排版易讀。`;
+
+            callGeminiAPI([{ text: prompt }]);
+        });
+
+        // ==========================================
+        // 共用 API 呼叫與雲端存檔
+        // ==========================================
+        async function callGeminiAPI(contentsParts) {
+            const apiKey = apiKeyInput.value.trim();
             const payload = { contents: [{ parts: contentsParts }] };
 
             try {
@@ -388,81 +283,50 @@
                 const data = await response.json();
                 if (data.error) throw new Error(data.error.message);
 
-                const rawText = data.candidates[0].content.parts[0].text;
-                renderMarkdownToElement(rawText, resultDiv);
-                saveToHistory(courseType, rawText);
+                currentSummaryText = data.candidates[0].content.parts[0].text;
+                resultDiv.innerHTML = marked.parse(currentSummaryText);
                 
-                statusText.innerText = '✅ 分析完成！自動存檔成功。';
+                statusText.innerText = '✅ 處理完成！您可以點擊下方按鈕將結果存至雲端。';
                 statusText.style.color = '#28a745';
+                recordBtn.style.display = 'block';
+                cloudBtn.style.display = 'block';
+
             } catch (error) {
-                resultDiv.innerHTML = '<span style="color:red;">發生錯誤：網路不穩定或 API Key 設定錯誤。</span>';
+                resultDiv.innerHTML = '<span style="color:red;">發生錯誤：可能是網路不穩或金鑰錯誤。</span>';
                 statusText.innerText = '❌ 處理失敗';
+                recordBtn.style.display = 'block';
             }
         }
 
-        // --- 筆記歷史紀錄相關函數 ---
-        function renderMarkdownToElement(text, element) {
-            element.innerHTML = marked.parse(text);
-            const mermaidBlocks = element.querySelectorAll('code.language-mermaid');
-            mermaidBlocks.forEach(block => {
-                const div = document.createElement('div');
-                div.className = 'mermaid';
-                div.textContent = block.textContent;
-                block.parentElement.replaceWith(div);
-            });
-            setTimeout(() => { mermaid.init(undefined, element.querySelectorAll('.mermaid')); }, 100);
-        }
-
-        function saveToHistory(courseType, text) {
-            let history = JSON.parse(localStorage.getItem('ee_notes_history')) || {};
-            if (!history[courseType]) history[courseType] = [];
-            const record = { id: Date.now(), time: new Date().toLocaleString('zh-TW'), content: text };
-            history[courseType].unshift(record);
-            localStorage.setItem('ee_notes_history', JSON.stringify(history));
-            loadHistory();
-        }
-
-        function loadHistory() {
-            const courseType = courseTypeSelect.value;
-            const courseName = courseTypeSelect.options[courseTypeSelect.selectedIndex].text;
-            document.getElementById('historyTitle').innerText = `🗂️ 歷史筆記庫 - ${courseName.split(' ')[1]}`;
-            const historyContainer = document.getElementById('historyContainer');
-            historyContainer.innerHTML = '';
+        cloudBtn.addEventListener('click', async () => {
+            if (!currentSummaryText) return;
+            const now = new Date();
+            const dateString = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2,'0')}${now.getDate().toString().padStart(2,'0')}_${now.getHours().toString().padStart(2,'0')}${now.getMinutes().toString().padStart(2,'0')}`;
+            const coursePrefix = courseTypeSelect.value; 
             
-            let history = JSON.parse(localStorage.getItem('ee_notes_history')) || {};
-            let courseRecords = history[courseType] || [];
-            if (courseRecords.length === 0) {
-                historyContainer.innerHTML = '<div style="text-align:center; color:#888;">此科目目前尚無存檔紀錄。</div>';
-                return;
-            }
-            courseRecords.forEach(record => {
-                const itemDiv = document.createElement('div');
-                itemDiv.className = 'history-item';
-                const timeDiv = document.createElement('div');
-                timeDiv.className = 'history-time';
-                timeDiv.innerText = `🕒 建立時間：${record.time}`;
-                const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'delete-btn';
-                deleteBtn.innerText = '刪除';
-                deleteBtn.onclick = () => deleteHistory(courseType, record.id);
-                const contentDiv = document.createElement('div');
-                renderMarkdownToElement(record.content, contentDiv);
-                itemDiv.appendChild(timeDiv);
-                itemDiv.appendChild(deleteBtn);
-                itemDiv.appendChild(contentDiv);
-                historyContainer.appendChild(itemDiv);
-            });
-        }
+            let filesToShare = [];
+            const textFile = new File([currentSummaryText], `${coursePrefix}_${currentMode}_${dateString}.txt`, { type: 'text/plain' });
+            filesToShare.push(textFile);
 
-        function deleteHistory(courseType, recordId) {
-            if(!confirm("確定要刪除這筆筆記嗎？")) return;
-            let history = JSON.parse(localStorage.getItem('ee_notes_history')) || {};
-            if(history[courseType]) {
-                history[courseType] = history[courseType].filter(r => r.id !== recordId);
-                localStorage.setItem('ee_notes_history', JSON.stringify(history));
-                loadHistory();
+            if (currentAudioBlob) {
+                const audioFile = new File([currentAudioBlob], `${coursePrefix}_錄音_${dateString}.webm`, { type: 'audio/webm' });
+                filesToShare.push(audioFile);
             }
-        }
+
+            if (navigator.canShare && navigator.canShare({ files: filesToShare })) {
+                try {
+                    await navigator.share({
+                        files: filesToShare,
+                        title: '上傳至雲端',
+                        text: `這是今天 ${coursePrefix} 的${currentMode}，請儲存。`
+                    });
+                    statusText.innerText = '☁️ 檔案已成功拋轉至系統選單！';
+                } catch (err) { console.log('使用者取消分享'); }
+            } else {
+                alert("您的瀏覽器不支援一鍵打包功能，請手動複製文字。");
+            }
+        });
     </script>
 </body>
 </html>
+
