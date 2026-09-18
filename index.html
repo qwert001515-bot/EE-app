@@ -12,14 +12,23 @@
         .container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px; }
         .selector-group { display: flex; flex-direction: column; gap: 10px; background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #e9ecef; }
         .selector-group label { font-weight: bold; color: #495057; font-size: 14px; }
-        input[type="password"], select, input[type="file"] { padding: 12px; font-size: 16px; border: 1px solid #ced4da; border-radius: 8px; width: 100%; box-sizing: border-box; }
+        input[type="password"], select { padding: 12px; font-size: 16px; border: 1px solid #ced4da; border-radius: 8px; width: 100%; box-sizing: border-box; }
+        
+        /* 檔案庫區塊樣式 */
+        .library-container { background: #e9ecef; padding: 15px; border-radius: 8px; display: flex; flex-direction: column; gap: 10px; }
+        .file-list { max-height: 150px; overflow-y: auto; background: white; border-radius: 6px; border: 1px solid #ced4da; }
+        .file-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid #eee; font-size: 14px; }
+        .file-item:last-child { border-bottom: none; }
+        .btn-small { padding: 6px 12px; font-size: 13px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .btn-upload { background-color: #28a745; color: white; width: 100%; padding: 10px;}
+        .btn-delete-file { background-color: #dc3545; color: white; }
+        .active-file-selector { background: #e3f2fd; border: 1px solid #b6d4fe; }
+        
         .btn-group { display: flex; gap: 10px; }
         button { padding: 15px; font-size: 16px; border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; width: 100%; transition: 0.3s; display: flex; justify-content: center; align-items: center; gap: 5px; }
         #recordBtn { background-color: #007bff; }
-        #recordBtn:active { background-color: #0056b3; }
         #stopBtn { background-color: #dc3545; display: none; }
-        #uploadBtn { background-color: #6f42c1; }
-        #uploadBtn:active { background-color: #59339d; }
+        #analyzeBtn { background-color: #6f42c1; }
         #status { text-align: center; font-size: 14px; color: #6c757d; font-weight: bold; }
         #audioPlayback { width: 100%; display: none; margin-top: 10px; border-radius: 8px; }
         
@@ -27,12 +36,9 @@
         h3 { color: #2c3e50; margin-top: 0; border-bottom: 2px solid #e9ecef; padding-bottom: 5px; }
         #result { background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #e9ecef; min-height: 100px; font-size: 15px; overflow-x: auto; }
         
-        /* 歷史紀錄區塊樣式 */
         .history-item { background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #e9ecef; margin-bottom: 10px; position: relative; }
         .history-time { font-size: 12px; color: #888; margin-bottom: 5px; font-weight: bold; }
         .delete-btn { position: absolute; top: 10px; right: 10px; background: #ff4d4f; color: white; border: none; padding: 5px 10px; font-size: 12px; border-radius: 4px; cursor: pointer; width: auto; }
-        
-        /* 圖表美化 */
         .mermaid { text-align: center; margin: 15px 0; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
     </style>
 </head>
@@ -43,9 +49,19 @@
     <div class="container">
         <input type="password" id="apiKey" placeholder="請貼上您的 Google AI 授權金鑰" />
         
+        <!-- 本地檔案庫管理區塊 -->
+        <div class="library-container">
+            <label>📚 我的平板講義庫 (永久儲存)：</label>
+            <div class="file-list" id="fileListUI">
+                <!-- 檔案列表會透過 JS 動態生成 -->
+            </div>
+            <input type="file" id="fileUpload" accept=".pdf,.txt" style="display:none;" />
+            <button id="triggerUploadBtn" class="btn-small btn-upload">📥 上傳新講義到庫中</button>
+        </div>
+
         <div class="selector-group">
             <div>
-                <label>📍 當前科目分區：</label>
+                <label>📍 當前科目筆記分區：</label>
                 <select id="courseType" onchange="loadHistory()">
                     <option value="ee_core">📘 理論必修 (工數/電路學/電子學/邏設)</option>
                     <option value="ee_lab">🔌 實驗操作 (基礎電學實驗)</option>
@@ -53,37 +69,40 @@
                     <option value="general">🌱 通識與倫理 (園藝/工程倫理)</option>
                 </select>
             </div>
+            
+            <div class="active-file-selector">
+                <label>🔍 選擇本次分析要搭配的講義：</label>
+                <select id="activeFileSelect">
+                    <option value="none">❌ 不使用講義 (僅分析錄音)</option>
+                    <!-- 其他選項會從檔案庫自動匯入 -->
+                </select>
+            </div>
+
             <div>
                 <label>🎯 AI 處理模式：</label>
                 <select id="modeType">
-                    <option value="notes">📝 圖文筆記總結</option>
-                    <option value="quiz">🎯 小考重點與模擬題</option>
-                    <option value="homework">✍️ 作業與解題提示</option>
+                    <option value="notes">📝 圖文筆記總結 (若有講義則對應頁碼)</option>
+                    <option value="quiz">🎯 小考重點與模擬題 (若有講義則對應頁碼)</option>
+                    <option value="homework">✍️ 作業與解題提示 (若有講義則對應頁碼)</option>
                 </select>
-            </div>
-            <div>
-                <label>📄 上傳電子書或講義 (PDF/TXT)：</label>
-                <input type="file" id="fileUpload" accept=".pdf,.txt" />
             </div>
         </div>
 
         <div class="btn-group">
-            <button id="recordBtn">🔴 錄音聽課</button>
-            <button id="stopBtn">⏹️ 停止錄音</button>
-            <button id="uploadBtn">📤 解析檔案</button>
+            <button id="recordBtn">🔴 開始錄音聽課</button>
+            <button id="stopBtn">⏹️ 停止錄音並分析</button>
+            <button id="analyzeBtn">📤 僅分析選定的講義</button>
         </div>
         
-        <div id="status">請選擇「錄音」或上傳檔案後點擊「解析檔案」</div>
+        <div id="status">準備就緒</div>
         <audio id="audioPlayback" controls></audio>
     </div>
 
-    <!-- 當前生成的結果 -->
     <div class="result-box">
         <h3>✨ 最新產出結果</h3>
         <div id="result"><span style="color:#6c757d;">產出內容會顯示在這裡...</span></div>
     </div>
 
-    <!-- 歷史檔案庫 (依照科目分類) -->
     <div class="history-box">
         <h3 id="historyTitle">🗂️ 歷史筆記庫</h3>
         <div id="historyContainer"></div>
@@ -92,25 +111,175 @@
     <script>
         mermaid.initialize({ startOnLoad: false, theme: 'default' });
 
+        // --- 全域資料庫設置 (EE_Study_DB_Multi) ---
+        const dbName = "EE_Study_DB_Multi";
+        const storeName = "all_files";
+
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(dbName, 1);
+                request.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains(storeName)) {
+                        db.createObjectStore(storeName, { keyPath: "id" });
+                    }
+                };
+                request.onsuccess = (e) => resolve(e.target.result);
+                request.onerror = (e) => reject(e.target.error);
+            });
+        }
+
+        async function saveFileToDB(fileData) {
+            const db = await initDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(storeName, "readwrite");
+                const store = tx.objectStore(storeName);
+                store.put(fileData);
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+            });
+        }
+
+        async function getAllFilesFromDB() {
+            const db = await initDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(storeName, "readonly");
+                const store = tx.objectStore(storeName);
+                const request = store.getAll();
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        async function getFileById(id) {
+            const db = await initDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(storeName, "readonly");
+                const store = tx.objectStore(storeName);
+                const request = store.get(id);
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        async function deleteFileFromDB(id) {
+            const db = await initDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(storeName, "readwrite");
+                const store = tx.objectStore(storeName);
+                const request = store.delete(id);
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        // --- UI 與錄音變數 ---
         let mediaRecorder;
         let audioChunks = [];
         
         const recordBtn = document.getElementById('recordBtn');
         const stopBtn = document.getElementById('stopBtn');
-        const uploadBtn = document.getElementById('uploadBtn');
+        const analyzeBtn = document.getElementById('analyzeBtn');
         const statusText = document.getElementById('status');
         const resultDiv = document.getElementById('result');
         const apiKeyInput = document.getElementById('apiKey');
-        const fileInput = document.getElementById('fileUpload');
         const courseTypeSelect = document.getElementById('courseType');
         const modeTypeSelect = document.getElementById('modeType');
-        const historyContainer = document.getElementById('historyContainer');
-        const historyTitle = document.getElementById('historyTitle');
+        
+        // 檔案庫管理相關元素
+        const fileInput = document.getElementById('fileUpload');
+        const triggerUploadBtn = document.getElementById('triggerUploadBtn');
+        const fileListUI = document.getElementById('fileListUI');
+        const activeFileSelect = document.getElementById('activeFileSelect');
 
-        // 頁面載入時，讀取當前選擇科目的歷史紀錄
-        window.onload = loadHistory;
+        window.onload = () => {
+            loadHistory();
+            refreshFileList();
+        };
 
-        // --- 錄音功能 ---
+        // --- 刷新檔案庫介面 ---
+        async function refreshFileList() {
+            const files = await getAllFilesFromDB();
+            
+            // 1. 更新清單列表 UI
+            fileListUI.innerHTML = '';
+            if (files.length === 0) {
+                fileListUI.innerHTML = '<div style="padding: 10px; text-align: center; color: #888;">講義庫目前是空的</div>';
+            } else {
+                files.forEach(file => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'file-item';
+                    
+                    const nameSpan = document.createElement('span');
+                    nameSpan.innerText = `📄 ${file.name}`;
+                    
+                    const delBtn = document.createElement('button');
+                    delBtn.className = 'btn-small btn-delete-file';
+                    delBtn.innerText = '刪除';
+                    delBtn.onclick = async () => {
+                        if(confirm(`確定要從庫中刪除 ${file.name} 嗎？`)) {
+                            await deleteFileFromDB(file.id);
+                            refreshFileList();
+                        }
+                    };
+                    
+                    itemDiv.appendChild(nameSpan);
+                    itemDiv.appendChild(delBtn);
+                    fileListUI.appendChild(itemDiv);
+                });
+            }
+
+            // 2. 更新下拉選單
+            const currentSelected = activeFileSelect.value;
+            activeFileSelect.innerHTML = '<option value="none">❌ 不使用講義 (僅分析錄音)</option>';
+            files.forEach(file => {
+                const option = document.createElement('option');
+                option.value = file.id;
+                option.innerText = `📖 ${file.name}`;
+                activeFileSelect.appendChild(option);
+            });
+            
+            // 嘗試保留原本的選擇
+            if (Array.from(activeFileSelect.options).some(opt => opt.value === currentSelected)) {
+                activeFileSelect.value = currentSelected;
+            }
+        }
+
+        // --- 處理檔案上傳至庫 ---
+        triggerUploadBtn.addEventListener('click', () => fileInput.click());
+
+        fileInput.addEventListener('change', async (e) => {
+            if (!e.target.files.length) return;
+            const file = e.target.files[0];
+            
+            statusText.innerText = '⏳ 正在將講義存入平板庫中...';
+
+            try {
+                const base64Data = await fileToBase64(file);
+                const mimeType = file.type === "application/pdf" ? "application/pdf" : "text/plain";
+                
+                const fileData = {
+                    id: Date.now().toString(),
+                    name: file.name,
+                    mimeType: mimeType,
+                    data: base64Data
+                };
+                
+                await saveFileToDB(fileData);
+                await refreshFileList();
+                
+                // 自動將下拉選單切換到剛上傳的檔案
+                activeFileSelect.value = fileData.id;
+                
+                statusText.innerText = `✅ 成功上傳 ${file.name}！`;
+                fileInput.value = ''; // 清空 input
+            } catch (err) {
+                alert('儲存檔案失敗，可能是檔案過大！');
+                statusText.innerText = '❌ 儲存失敗';
+            }
+        });
+
+        // --- 錄音與分析流程 ---
         recordBtn.addEventListener('click', async () => {
             if (!checkApiKey()) return;
             try {
@@ -122,7 +291,7 @@
                 mediaRecorder.start();
                 
                 recordBtn.style.display = 'none';
-                uploadBtn.style.display = 'none';
+                analyzeBtn.style.display = 'none';
                 stopBtn.style.display = 'flex';
                 statusText.innerText = '🎙️ 正在錄音中...';
                 statusText.style.color = '#dc3545';
@@ -135,19 +304,18 @@
             mediaRecorder.stop();
             mediaRecorder.stream.getTracks().forEach(track => track.stop());
             resetButtons();
-            statusText.innerText = '⏳ 正在處理錄音...';
+            statusText.innerText = '⏳ 正在處理中...';
         });
 
-        // --- 檔案上傳功能 ---
-        uploadBtn.addEventListener('click', () => {
+        analyzeBtn.addEventListener('click', async () => {
             if (!checkApiKey()) return;
-            if (!fileInput.files.length) {
-                alert("請先選擇要上傳的 PDF 或 TXT 檔案！");
+            if (activeFileSelect.value === "none") {
+                alert("請先在上方『選擇本次分析要搭配的講義』中挑選一份講義！");
                 return;
             }
-            statusText.innerText = '⏳ 正在閱讀檔案並生成內容...';
+            statusText.innerText = '⏳ 正在閱讀您的講義並生成內容...';
             statusText.style.color = '#007bff';
-            processMedia('file');
+            processMedia('file_only');
         });
 
         function checkApiKey() {
@@ -160,7 +328,7 @@
 
         function resetButtons() {
             recordBtn.style.display = 'flex';
-            uploadBtn.style.display = 'flex';
+            analyzeBtn.style.display = 'flex';
             stopBtn.style.display = 'none';
         }
 
@@ -173,44 +341,45 @@
             });
         }
 
-        // --- 核心 API 呼叫 ---
         async function processMedia(type) {
-            resultDiv.innerHTML = '<span style="color:#6c757d;">處理中，請稍候...</span>';
+            resultDiv.innerHTML = '<span style="color:#6c757d;">AI 正在分析您的資料，請稍候...</span>';
             const apiKey = apiKeyInput.value.trim();
             const courseType = courseTypeSelect.value;
             const modeType = modeTypeSelect.value;
+            const selectedFileId = activeFileSelect.value;
+            
+            let contentsParts = [];
 
-            let mimeType = "";
-            let base64Data = "";
+            // 1. 抓取被選定的電子書
+            let selectedEbook = null;
+            if (selectedFileId !== "none") {
+                selectedEbook = await getFileById(selectedFileId);
+                if (selectedEbook) {
+                    contentsParts.push({ inlineData: { mimeType: selectedEbook.mimeType, data: selectedEbook.data } });
+                }
+            }
 
+            // 2. 如果是錄音模式，加入錄音檔
             if (type === 'audio') {
                 const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
                 document.getElementById('audioPlayback').src = URL.createObjectURL(audioBlob);
                 document.getElementById('audioPlayback').style.display = 'block';
-                base64Data = await fileToBase64(audioBlob);
-                mimeType = "audio/webm";
-            } else if (type === 'file') {
-                const file = fileInput.files[0];
-                base64Data = await fileToBase64(file);
-                mimeType = file.type === "application/pdf" ? "application/pdf" : "text/plain";
+                const audioBase64 = await fileToBase64(audioBlob);
+                contentsParts.push({ inlineData: { mimeType: "audio/webm", data: audioBase64 } });
             }
 
-            // 組合提示詞
+            // 3. 組合提示詞
             let context = `這份資料屬於「${courseTypeSelect.options[courseTypeSelect.selectedIndex].text}」。`;
             let taskPrompt = modeType === "notes" ? "請整理完整筆記。若有需要請用 ```mermaid 畫出流程圖或心智圖。" :
                              modeType === "quiz" ? "請整理小考重點並出 3 題模擬測驗題。" :
                              "請提取作業題目並提供解題思路（勿直接給答案）。若需架構圖請用 ```mermaid 語法。";
             
-            const promptText = context + taskPrompt + " 請用繁體中文 Markdown 輸出。";
+            let pagePrompt = selectedEbook ? `\n\n【特別要求】：請務必在輸出的最後，獨立建立一個「📖 對應講義頁面」區塊。請精準標示出重點對應在《${selectedEbook.name}》這份檔案中的「章節名稱」與「具體頁碼範圍」。` : "";
+            
+            const promptText = context + taskPrompt + pagePrompt + " 請用繁體中文 Markdown 輸出。";
+            contentsParts.unshift({ text: promptText }); 
 
-            const payload = {
-                contents: [{
-                    parts: [
-                        { text: promptText },
-                        { inlineData: { mimeType: mimeType, data: base64Data } }
-                    ]
-                }]
-            };
+            const payload = { contents: [{ parts: contentsParts }] };
 
             try {
                 const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
@@ -220,23 +389,18 @@
                 if (data.error) throw new Error(data.error.message);
 
                 const rawText = data.candidates[0].content.parts[0].text;
-                
-                // 渲染畫面
                 renderMarkdownToElement(rawText, resultDiv);
-                
-                // 儲存到本地資料庫
                 saveToHistory(courseType, rawText);
                 
-                statusText.innerText = '✅ 處理完成並已自動存檔！';
+                statusText.innerText = '✅ 分析完成！自動存檔成功。';
                 statusText.style.color = '#28a745';
-
             } catch (error) {
-                resultDiv.innerHTML = '<span style="color:red;">發生錯誤，請檢查檔案大小或 API Key。</span>';
+                resultDiv.innerHTML = '<span style="color:red;">發生錯誤：網路不穩定或 API Key 設定錯誤。</span>';
                 statusText.innerText = '❌ 處理失敗';
             }
         }
 
-        // --- 渲染 Markdown 與圖表 ---
+        // --- 筆記歷史紀錄相關函數 ---
         function renderMarkdownToElement(text, element) {
             element.innerHTML = marked.parse(text);
             const mermaidBlocks = element.querySelectorAll('code.language-mermaid');
@@ -249,53 +413,40 @@
             setTimeout(() => { mermaid.init(undefined, element.querySelectorAll('.mermaid')); }, 100);
         }
 
-        // --- 本地資料庫 (LocalStorage) 存取邏輯 ---
         function saveToHistory(courseType, text) {
             let history = JSON.parse(localStorage.getItem('ee_notes_history')) || {};
             if (!history[courseType]) history[courseType] = [];
-            
-            // 建立一筆新紀錄，包含時間和內容
-            const record = {
-                id: Date.now(),
-                time: new Date().toLocaleString('zh-TW'),
-                content: text
-            };
-            
-            history[courseType].unshift(record); // 把最新的放在最前面
+            const record = { id: Date.now(), time: new Date().toLocaleString('zh-TW'), content: text };
+            history[courseType].unshift(record);
             localStorage.setItem('ee_notes_history', JSON.stringify(history));
-            loadHistory(); // 重新載入歷史區塊
+            loadHistory();
         }
 
         function loadHistory() {
             const courseType = courseTypeSelect.value;
             const courseName = courseTypeSelect.options[courseTypeSelect.selectedIndex].text;
-            historyTitle.innerText = `🗂️ 歷史筆記庫 - ${courseName.split(' ')[1]}`;
+            document.getElementById('historyTitle').innerText = `🗂️ 歷史筆記庫 - ${courseName.split(' ')[1]}`;
+            const historyContainer = document.getElementById('historyContainer');
             historyContainer.innerHTML = '';
-
+            
             let history = JSON.parse(localStorage.getItem('ee_notes_history')) || {};
             let courseRecords = history[courseType] || [];
-
             if (courseRecords.length === 0) {
                 historyContainer.innerHTML = '<div style="text-align:center; color:#888;">此科目目前尚無存檔紀錄。</div>';
                 return;
             }
-
             courseRecords.forEach(record => {
                 const itemDiv = document.createElement('div');
                 itemDiv.className = 'history-item';
-                
                 const timeDiv = document.createElement('div');
                 timeDiv.className = 'history-time';
                 timeDiv.innerText = `🕒 建立時間：${record.time}`;
-                
                 const deleteBtn = document.createElement('button');
                 deleteBtn.className = 'delete-btn';
                 deleteBtn.innerText = '刪除';
                 deleteBtn.onclick = () => deleteHistory(courseType, record.id);
-
                 const contentDiv = document.createElement('div');
                 renderMarkdownToElement(record.content, contentDiv);
-
                 itemDiv.appendChild(timeDiv);
                 itemDiv.appendChild(deleteBtn);
                 itemDiv.appendChild(contentDiv);
