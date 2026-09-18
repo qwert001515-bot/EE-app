@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>學習器 (Pro 穩定版)</title>
+    <title>學習器 (Pro)</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
     <style>
@@ -253,20 +253,25 @@
         let mediaRecorder, audioChunks = [], currentAudioBlob = null, currentSummaryText = "", currentMode = "學習筆記";
         const statusText = document.getElementById('status'), resultDiv = document.getElementById('result'), wolframResultImg = document.getElementById('wolframResult'), actionGroup = document.getElementById('actionGroup'), audioPlayback = document.getElementById('audioPlayback');
         
-        // 🚀 最簡潔、最標準、無加工的檔案讀取方式
+        // 🚀 強制校正檔案格式：不管 iPad 怎麼說，只要是圖片我們通通強制宣告為 image/jpeg 給 Google 審查！
         function processFileSimple(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.onload = (e) => {
-                    // e.target.result 的格式為 "data:image/jpeg;base64,/9j/4AAQ..."
-                    // 我們只要逗號後面的純 Base64 字串
-                    const base64String = e.target.result.split(',')[1];
-                    // 為了避免 iPad HEIC 格式不相容問題，MIME 統一設定為 Google 支援的 image/jpeg
-                    let mimeType = file.type;
-                    if (!mimeType || mimeType === "" || mimeType.includes("heic")) {
-                        mimeType = "image/jpeg";
+                    const result = e.target.result;
+                    let base64String = "";
+                    
+                    if (result.includes(',')) {
+                        base64String = result.split(',')[1];
+                    } else {
+                        base64String = result;
                     }
-                    resolve({ mimeType: mimeType, data: base64String });
+                    
+                    // 為了確保字串絕對乾淨，手動去除可能夾帶的換行符號
+                    base64String = base64String.replace(/[\r\n\s]+/g, "");
+
+                    // 強制安全 MIME Type：不管 file.type 回傳什麼怪東西 (如空字串、image/heic)，一律當作 jpeg 給 Gemini 處理
+                    resolve({ mimeType: "image/jpeg", data: base64String });
                 };
                 reader.onerror = () => reject(new Error("無法讀取檔案"));
                 reader.readAsDataURL(file);
