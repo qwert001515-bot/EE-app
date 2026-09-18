@@ -216,11 +216,15 @@
         libraryUpload.addEventListener('change', async (e) => {
             if(!e.target.files.length) return;
             document.getElementById('status').innerText = '⏳ 正在存入平板書庫...';
-            const f = e.target.files[0];
-            const fileData = await processFileBinary(f);
-            await saveFileDB({ id: Date.now().toString(), name: f.name, mimeType: fileData.mimeType, data: fileData.data });
-            await refreshLibrary();
-            document.getElementById('status').innerText = '✅ 講義永久儲存成功！';
+            try {
+                const f = e.target.files[0];
+                const fileData = await getSafeImageData(f);
+                await saveFileDB({ id: Date.now().toString(), name: f.name, mimeType: fileData.mimeType, data: fileData.data });
+                await refreshLibrary();
+                document.getElementById('status').innerText = '✅ 講義永久儲存成功！';
+            } catch (err) {
+                document.getElementById('status').innerText = '❌ 講義存入失敗。';
+            }
             libraryUpload.value = '';
         });
         window.onload = refreshLibrary;
@@ -253,40 +257,56 @@
         let mediaRecorder, audioChunks = [], currentAudioBlob = null, currentSummaryText = "", currentMode = "學習筆記";
         const statusText = document.getElementById('status'), resultDiv = document.getElementById('result'), wolframResultImg = document.getElementById('wolframResult'), actionGroup = document.getElementById('actionGroup'), audioPlayback = document.getElementById('audioPlayback');
         
-        // 🚀 終極二進位讀取與強制填充器
-        function encodeBase64WithPadding(buffer) {
-            let binary = '';
-            const bytes = new Uint8Array(buffer);
-            // 為了避免 iPad 記憶體崩潰，我們採用分塊轉換字串
-            const chunkSize = 8192;
-            for (let i = 0; i < bytes.length; i += chunkSize) {
-                binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
-            }
-            let base64 = window.btoa(binary);
-            
-            // 強制檢查並補齊 Base64 結尾的 '=' (Google API 嚴格要求)
-            while (base64.length % 4 !== 0) {
-                base64 += '=';
-            }
-            return base64;
-        }
-
-        function processFileBinary(file) {
+        // 🚀 鐵血防線：強制轉存安全尺寸 JPEG，上傳前檢查字串長度
+        function getSafeImageData(file) {
             return new Promise((resolve, reject) => {
+                if (!file) return reject("沒有選擇檔案");
+                
                 const reader = new FileReader();
                 reader.onload = (e) => {
-                    try {
-                        const base64String = encodeBase64WithPadding(e.target.result);
-                        // 強制宣告為 image/jpeg 以通過 Gemini 審查
-                        const safeMime = file.type.startsWith('image/') ? 'image/jpeg' : (file.type || 'text/plain');
-                        resolve({ mimeType: safeMime, data: base64String });
-                    } catch (err) {
-                        reject(err);
+                    // 如果不是圖片，直接回傳
+                    if (!file.type.startsWith('image/')) {
+                        const b64 = e.target.result.split(',')[1];
+                        if (!b64 || b64.length < 10) return reject("檔案資料過短");
+                        resolve({ mimeType: file.type, data: b64 });
+                        return;
                     }
+
+                    const img = new Image();
+                    img.onload = () => {
+                        try {
+                            const canvas = document.createElement('canvas');
+                            let w = img.width, h = img.height;
+                            // 鐵血降級：最大邊長縮至 800，確保 iPad 絕對不會 OOM (Out Of Memory)
+                            const max = 800; 
+                            if (w > h && w > max) { h *= max / w; w = max; }
+                            else if (h > max) { w *= max / h; h = max; }
+                            
+                            canvas.width = w; 
+                            canvas.height = h;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, w, h);
+                            
+                            // 強制轉出 70% 畫質的 JPEG
+                            const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                            const b64 = dataUrl.split(',')[1];
+                            
+                            // 鐵血攔截：如果轉出的字串太短，代表轉換失敗，立即拋出錯誤
+                            if (!b64 || b64.length < 100) {
+                                reject("Safari 圖片轉換失敗，請重新拍攝或選取。");
+                                return;
+                            }
+                            
+                            resolve({ mimeType: "image/jpeg", data: b64 });
+                        } catch (err) {
+                            reject("圖片處理發生錯誤：" + err.message);
+                        }
+                    };
+                    img.onerror = () => reject("無法載入圖片進行處理。");
+                    img.src = e.target.result;
                 };
-                reader.onerror = () => reject(new Error("無法讀取檔案"));
-                // 放棄 DataURL，直接讀取底層二進位陣列
-                reader.readAsArrayBuffer(file);
+                reader.onerror = () => reject("FileReader 無法讀取此檔案。");
+                reader.readAsDataURL(file);
             });
         }
         
@@ -321,16 +341,21 @@
                 const fData = await getFileByIdDB(activeFileSelect.value);
                 if(fData) parts.push({ inlineData: { mimeType: fData.mimeType, data: fData.data } });
             }
-            const audioData = await processFileBinary(currentAudioBlob);
-            parts.push({ inlineData: { mimeType: "audio/webm", data: audioData.data } });
-            let pText = `整理「${document.getElementById('courseType').value}」課程的錄音筆記。若遇邏輯流程請用 \`\`\`mermaid 繪圖。`;
-            if (document.getElementById('recordModeSelect').value === 'book') pText += "請比對講義並標示頁碼。";
-            parts.unshift({ text: pText });
-            callGeminiAPI(parts);
+            try {
+                const audioData = await getSafeImageData(currentAudioBlob);
+                parts.push({ inlineData: audioData });
+                let pText = `整理「${document.getElementById('courseType').value}」課程的錄音筆記。若遇邏輯流程請用 \`\`\`mermaid 繪圖。`;
+                if (document.getElementById('recordModeSelect').value === 'book') pText += "請比對講義並標示頁碼。";
+                parts.unshift({ text: pText });
+                callGeminiAPI(parts);
+            } catch (error) {
+                statusText.innerText = '❌ 錄音資料處理失敗'; resultDiv.style.display = 'block'; resultDiv.innerHTML = `<span style="color:red;">${error}</span>`;
+            }
         }
 
         const photoFile = document.getElementById('photoFile'), imgPrev = document.getElementById('imagePreview');
         photoFile.onchange = e => { if (e.target.files.length) { imgPrev.src = URL.createObjectURL(e.target.files[0]); imgPrev.style.display = 'block'; } };
+        
         document.getElementById('analyzePhotoBtn').onclick = async () => {
             const hwEngine = document.getElementById('hwEngineSelect').value;
             if (!apiKeyInput.value) return alert("Gemini 金鑰必填！");
@@ -340,7 +365,7 @@
             currentMode = "拍照解題"; currentAudioBlob = null; audioPlayback.style.display = 'none'; actionGroup.classList.add('hidden');
             
             try {
-                const fileData = await processFileBinary(photoFile.files[0]);
+                const fileData = await getSafeImageData(photoFile.files[0]);
 
                 if (hwEngine === 'gemini') {
                     wolframResultImg.style.display = 'none'; resultDiv.style.display = 'block'; statusText.innerText = '🧠 Gemini Pro 解析中...';
@@ -361,8 +386,8 @@
                         wolframResultImg.onerror = () => { statusText.innerText = '❌ Wolfram 計算載入失敗'; wolframResultImg.style.display = 'none'; };
                     } catch(e) { statusText.innerText = '❌ 辨識失敗'; resultDiv.innerHTML = `<span style="color:red;">錯誤原因：${e.message || '未知錯誤'}</span>`; }
                 }
-            } catch (e) {
-                statusText.innerText = '❌ 圖片讀取失敗'; resultDiv.innerHTML = `<span style="color:red;">請重新選擇圖片。</span>`;
+            } catch (error) {
+                statusText.innerText = '❌ 圖片讀取失敗'; resultDiv.style.display = 'block'; resultDiv.innerHTML = `<span style="color:red; font-weight:bold;">🚨 錯誤：${error}</span><br>這張照片的格式無法被 iPad 正確讀取，請嘗試重新截圖或拍攝。`;
             }
         };
 
@@ -385,7 +410,7 @@
                     
                     let parts = [{ text: `解答以下問題：\n${q || "請解析這張圖片的電路原理或內容"}\n需要時請使用 \`\`\`mermaid 繪製架構圖。` }];
                     if (hasImg) {
-                        const fileData = await processFileBinary(qaPhotoFile.files[0]);
+                        const fileData = await getSafeImageData(qaPhotoFile.files[0]);
                         parts.push({ inlineData: fileData });
                     }
                     callGeminiAPI(parts);
@@ -396,7 +421,7 @@
                     if (hasImg) {
                         resultDiv.style.display = 'block'; wolframResultImg.style.display = 'none'; statusText.innerText = '👀 正在請 Gemini 讀取圖片中的算式...';
                         try {
-                            const fileData = await processFileBinary(qaPhotoFile.files[0]);
+                            const fileData = await getSafeImageData(qaPhotoFile.files[0]);
                             const res = await fetch(`[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=$){apiKeyInput.value.trim()}`, {
                                 method: 'POST', headers: { 'Content-Type': 'application/json' }, 
                                 body: JSON.stringify({ contents: [{ parts: [{text: "Extract ONLY the math expression in plain text (e.g. x^2+5x=0). NO markdown."}, { inlineData: fileData }] }] })
@@ -418,8 +443,8 @@
                         wolframResultImg.onerror = () => { statusText.innerText = '❌ 計算失敗，請檢查算式'; wolframResultImg.style.display = 'none'; };
                     }
                 }
-            } catch (e) {
-                statusText.innerText = '❌ 處理失敗'; resultDiv.innerHTML = `<span style="color:red;">檔案讀取錯誤，請重新上傳。</span>`;
+            } catch (error) {
+                statusText.innerText = '❌ 處理失敗'; resultDiv.style.display = 'block'; resultDiv.innerHTML = `<span style="color:red; font-weight:bold;">🚨 錯誤：${error}</span><br>這張照片的格式無法被 iPad 正確讀取，請嘗試使用截圖功能重新擷取畫面再上傳。`;
             }
         };
 
