@@ -20,7 +20,7 @@
         textarea { padding: 12px; font-size: 16px; border: 1px solid #ced4da; border-radius: 8px; width: 100%; box-sizing: border-box; resize: vertical; font-family: inherit; }
         
         /* 按鈕樣式 */
-        button { padding: 15px; font-size: 16px; border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; width: 100%; transition: 0.3s; }
+        button { padding: 15px; font-size: 16px; border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; width: 100%; transition: 0.3s; margin-top: 5px; }
         .btn-blue { background-color: #007bff; }
         .btn-red { background-color: #dc3545; display: none; }
         .btn-purple { background-color: #6f42c1; }
@@ -29,7 +29,9 @@
         
         #status { text-align: center; font-size: 15px; color: #6c757d; font-weight: bold; margin-top: 10px; }
         #audioPlayback { width: 100%; display: none; margin-top: 10px; border-radius: 8px; }
-        #imagePreview { max-width: 100%; border-radius: 8px; display: none; margin-top: 10px; border: 1px solid #dee2e6; }
+        
+        /* 圖片預覽共用樣式 */
+        .img-preview { max-width: 100%; border-radius: 8px; display: none; margin-top: 10px; border: 1px solid #dee2e6; }
         
         .result-box { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         h3 { color: #2c3e50; margin-top: 0; border-bottom: 2px solid #e9ecef; padding-bottom: 5px; }
@@ -56,19 +58,28 @@
         </div>
     </div>
 
-    <!-- 頁籤切換 (新增問答區) -->
+    <!-- 頁籤切換 -->
     <div class="tab-container">
-        <button class="tab-btn active" id="tabBook" onclick="switchTab('book')">📖 聽課錄音</button>
-        <button class="tab-btn" id="tabHomework" onclick="switchTab('homework')">📸 拍照解題</button>
+        <button class="tab-btn active" id="tabBook" onclick="switchTab('book')">🎙️ 聽課錄音</button>
+        <button class="tab-btn" id="tabHomework" onclick="switchTab('homework')">📸 作業解題</button>
         <button class="tab-btn" id="tabQA" onclick="switchTab('qa')">💬 隨問隨答</button>
     </div>
 
-    <!-- 區域 1：聽課與書本區 -->
+    <!-- 區域 1：聽課錄音區 -->
     <div class="container" id="sectionBook">
         <div class="input-group">
-            <label>📄 (選填) 上傳參考講義 (PDF/TXT)：</label>
+            <label>⚙️ 選擇錄音模式：</label>
+            <select id="recordModeSelect" onchange="toggleFileUI()">
+                <option value="pure">🎙️ 純錄音模式 (最快速，無須講義)</option>
+                <option value="book">📖 講義比對模式 (上傳講義以對應頁碼)</option>
+            </select>
+        </div>
+        
+        <div class="input-group hidden" id="fileUploadGroup" style="margin-top: 10px;">
+            <label>📄 上傳本堂課講義 (PDF/TXT)：</label>
             <input type="file" id="bookFile" accept=".pdf,.txt" />
         </div>
+
         <button class="btn-blue" id="recordBtn">🔴 開始錄音聽課</button>
         <button class="btn-red" id="stopBtn">⏹️ 停止錄音並總結</button>
     </div>
@@ -78,18 +89,23 @@
         <div class="input-group">
             <label>📸 拍攝黑板或作業紙本：</label>
             <input type="file" id="photoFile" accept="image/*" capture="environment" />
-            <img id="imagePreview" alt="預覽圖片" />
+            <img id="imagePreview" class="img-preview" alt="預覽圖片" />
         </div>
         <button class="btn-purple" id="analyzePhotoBtn">🧠 讓 AI 幫我解題</button>
     </div>
 
-    <!-- 區域 3：文字隨問隨答區 (全新加入) -->
+    <!-- 區域 3：圖文隨問隨答區 (升級版) -->
     <div class="container hidden" id="sectionQA">
         <div class="input-group">
-            <label>💬 輸入你的問題：</label>
-            <textarea id="questionText" rows="4" placeholder="例如：請用最簡單的話解釋戴維寧定理，並舉一個例子。"></textarea>
+            <label>📸 (選填) 拍攝或上傳圖片補充：</label>
+            <input type="file" id="qaPhotoFile" accept="image/*" capture="environment" />
+            <img id="qaImagePreview" class="img-preview" alt="預覽圖片" />
         </div>
-        <button class="btn-teal" id="askBtn">💡 送出問題</button>
+        <div class="input-group">
+            <label>💬 輸入你的問題：</label>
+            <textarea id="questionText" rows="4" placeholder="例如：請幫我看看這張圖裡的戴維寧等效電壓 Vth 是怎麼算出來的？"></textarea>
+        </div>
+        <button class="btn-teal" id="askBtn">💡 傳送問題</button>
     </div>
 
     <!-- 共用狀態與雲端按鈕 -->
@@ -107,6 +123,17 @@
 
     <script>
         // --- UI 切換邏輯 ---
+        function toggleFileUI() {
+            const mode = document.getElementById('recordModeSelect').value;
+            const fileGroup = document.getElementById('fileUploadGroup');
+            if (mode === 'book') {
+                fileGroup.classList.remove('hidden');
+            } else {
+                fileGroup.classList.add('hidden');
+                document.getElementById('bookFile').value = ""; 
+            }
+        }
+
         function switchTab(mode) {
             ['tabBook', 'tabHomework', 'tabQA'].forEach(id => document.getElementById(id).classList.remove('active'));
             ['sectionBook', 'sectionHomework', 'sectionQA'].forEach(id => document.getElementById(id).classList.add('hidden'));
@@ -114,15 +141,15 @@
             if (mode === 'book') {
                 document.getElementById('tabBook').classList.add('active');
                 document.getElementById('sectionBook').classList.remove('hidden');
-                document.getElementById('status').innerText = '準備就緒，可上傳講義或直接錄音。';
+                document.getElementById('status').innerText = '準備就緒，可開始錄音。';
             } else if (mode === 'homework') {
                 document.getElementById('tabHomework').classList.add('active');
                 document.getElementById('sectionHomework').classList.remove('hidden');
-                document.getElementById('status').innerText = '請點擊上方按鈕開啟相機拍照。';
+                document.getElementById('status').innerText = '請點擊上方按鈕開啟相機拍攝作業。';
             } else if (mode === 'qa') {
                 document.getElementById('tabQA').classList.add('active');
                 document.getElementById('sectionQA').classList.remove('hidden');
-                document.getElementById('status').innerText = '遇到不懂的觀念？直接打字問 AI 吧！';
+                document.getElementById('status').innerText = '遇到不懂的觀念？直接拍照或打字問 AI 吧！';
             }
         }
 
@@ -131,7 +158,7 @@
         let audioChunks = [];
         let currentAudioBlob = null;
         let currentSummaryText = "";
-        let currentMode = "book"; 
+        let currentMode = "純錄音筆記"; 
         
         const apiKeyInput = document.getElementById('apiKey');
         const courseTypeSelect = document.getElementById('courseType');
@@ -150,14 +177,21 @@
         }
 
         // ==========================================
-        // 模式 1：聽課與書本區 (錄音)
+        // 模式 1：聽課錄音區
         // ==========================================
         const recordBtn = document.getElementById('recordBtn');
         const stopBtn = document.getElementById('stopBtn');
         const bookFile = document.getElementById('bookFile');
+        const recordModeSelect = document.getElementById('recordModeSelect');
 
         recordBtn.addEventListener('click', async () => {
             if (!apiKeyInput.value) return alert("請先輸入金鑰！");
+            
+            if (recordModeSelect.value === 'book' && bookFile.files.length === 0) {
+                alert("您選擇了『講義比對模式』，請先上傳講義！或切換回『純錄音模式』。");
+                return;
+            }
+
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 mediaRecorder = new MediaRecorder(stream);
@@ -179,18 +213,19 @@
             mediaRecorder.stop();
             mediaRecorder.stream.getTracks().forEach(track => track.stop());
             stopBtn.style.display = 'none';
-            statusText.innerText = '⏳ 正在交叉比對資料，請稍候...';
+            statusText.innerText = '⏳ 正在處理您的錄音，請稍候...';
             statusText.style.color = '#007bff';
         });
 
         async function processBookMode() {
-            currentMode = "書本筆記";
+            currentMode = recordModeSelect.value === 'pure' ? "純錄音筆記" : "講義錄音筆記";
             currentAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
             audioPlayback.src = URL.createObjectURL(currentAudioBlob);
             audioPlayback.style.display = 'block';
 
             let contentsParts = [];
-            if (bookFile.files.length > 0) {
+            
+            if (recordModeSelect.value === 'book' && bookFile.files.length > 0) {
                 const file = bookFile.files[0];
                 const fileB64 = await fileToBase64(file);
                 const mime = file.type === "application/pdf" ? "application/pdf" : "text/plain";
@@ -202,14 +237,16 @@
 
             const courseName = courseTypeSelect.value;
             let prompt = `這是一堂電機系「${courseName}」的課堂錄音。請幫我整理核心觀念與公式。`;
-            if (bookFile.files.length > 0) prompt += "並比對上傳的講義，標示出對應章節或頁碼。";
+            if (recordModeSelect.value === 'book' && bookFile.files.length > 0) {
+                prompt += "並比對上傳的講義，標示出對應章節或頁碼。";
+            }
             contentsParts.unshift({ text: prompt + " 請用繁體中文 Markdown 輸出。" });
 
             callGeminiAPI(contentsParts);
         }
 
         // ==========================================
-        // 模式 2：作業與拍照區 (圖片解題)
+        // 模式 2：作業與拍照區
         // ==========================================
         const photoFile = document.getElementById('photoFile');
         const analyzePhotoBtn = document.getElementById('analyzePhotoBtn');
@@ -239,34 +276,64 @@
             const imageB64 = await fileToBase64(file);
             const mimeType = file.type || "image/jpeg";
             const courseName = courseTypeSelect.value;
-            const prompt = `這是一張電機系「${courseName}」的作業照片。請解析題目內容，並提供「詳細解題思路與步驟提示」。不要只給最終答案。請用繁體中文 Markdown 輸出。`;
+            const prompt = `這是一張電機系「${courseName}」的作業或黑板照片。請解析題目內容，並提供「詳細解題思路與步驟提示」。不要只給最終答案。請用繁體中文 Markdown 輸出。`;
 
             callGeminiAPI([{ text: prompt }, { inlineData: { mimeType: mimeType, data: imageB64 } }]);
         });
 
         // ==========================================
-        // 模式 3：文字隨問隨答區 (打字發問)
+        // 模式 3：圖文隨問隨答區 (升級支援照片)
         // ==========================================
+        const qaPhotoFile = document.getElementById('qaPhotoFile');
+        const qaImagePreview = document.getElementById('qaImagePreview');
         const questionText = document.getElementById('questionText');
         const askBtn = document.getElementById('askBtn');
 
+        qaPhotoFile.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                qaImagePreview.src = URL.createObjectURL(e.target.files[0]);
+                qaImagePreview.style.display = 'block';
+            } else {
+                qaImagePreview.style.display = 'none';
+            }
+        });
+
         askBtn.addEventListener('click', async () => {
             if (!apiKeyInput.value) return alert("請先輸入金鑰！");
-            if (!questionText.value.trim()) return alert("請輸入你想問的問題！");
+            
+            // 必須至少有打字 或 至少有傳照片 才能發問
+            if (!questionText.value.trim() && qaPhotoFile.files.length === 0) {
+                return alert("請至少輸入你想問的問題，或者拍攝一張圖片！");
+            }
 
             currentMode = "隨問隨答";
             currentAudioBlob = null;
             audioPlayback.style.display = 'none';
             cloudBtn.style.display = 'none';
 
-            statusText.innerText = '💡 AI 思考中...';
+            statusText.innerText = '💡 AI 正在思考您的問題...';
             statusText.style.color = '#17a2b8';
             resultDiv.innerHTML = '<span style="color:#6c757d;">處理中...</span>';
 
             const courseName = courseTypeSelect.value;
-            const prompt = `你是電機系的專業助教。這堂課是「${courseName}」。學生問了以下問題：\n\n${questionText.value}\n\n請用繁體中文詳細且具邏輯地解答，請善用 Markdown 語法讓排版易讀。`;
+            
+            // 如果只有傳照片沒有打字，設定一個預設的問題
+            const userQuestion = questionText.value.trim() || "請幫我解析這張圖片裡面的核心內容或是相關的電路/公式。";
+            
+            const prompt = `你是電機系的專業助教。這堂課是「${courseName}」。學生問了以下問題：\n\n${userQuestion}\n\n請用繁體中文詳細且具邏輯地解答，請善用 Markdown 語法讓排版易讀。`;
 
-            callGeminiAPI([{ text: prompt }]);
+            let contentsParts = [];
+            contentsParts.push({ text: prompt });
+
+            // 如果有上傳附圖，把它包進去
+            if (qaPhotoFile.files.length > 0) {
+                const file = qaPhotoFile.files[0];
+                const imageB64 = await fileToBase64(file);
+                const mimeType = file.type || "image/jpeg";
+                contentsParts.push({ inlineData: { mimeType: mimeType, data: imageB64 } });
+            }
+
+            callGeminiAPI(contentsParts);
         });
 
         // ==========================================
@@ -292,7 +359,7 @@
                 cloudBtn.style.display = 'block';
 
             } catch (error) {
-                resultDiv.innerHTML = '<span style="color:red;">發生錯誤：可能是網路不穩或金鑰錯誤。</span>';
+                resultDiv.innerHTML = '<span style="color:red;">發生錯誤：可能是網路不穩、圖片過大或金鑰錯誤。</span>';
                 statusText.innerText = '❌ 處理失敗';
                 recordBtn.style.display = 'block';
             }
@@ -329,4 +396,3 @@
     </script>
 </body>
 </html>
-
